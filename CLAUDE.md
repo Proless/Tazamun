@@ -90,7 +90,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 - [ ] GitHub Actions: lint, type-check, tests, dependency audit, license check on every PR. *(All but the license check are in `ci.yml`.)*
 - [ ] Renovate or Dependabot configured for npm, GitHub Actions and Docker base-image digests (DEP-37). *(npm and Actions done; add Docker when the Dockerfile lands.)*
 - [ ] `packages/core/crypto`: Argon2id (WASM), HKDF, AES-GCM wrap and unwrap, payload encrypt and decrypt with AAD. **Test vectors** committed.
-- [ ] `packages/core/hlc`: HLC with tests (monotonic, clock skew, comparison including device ID).
+- [x] `packages/core/hlc`: HLC with tests (monotonic, clock skew, comparison including device ID).
 - [ ] `packages/core/schema`: record envelope plus a payload schema per collection (zod), with schema versions.
 - [ ] Settle Q1 (server framework and SQLite driver) and record it in ADR-0004.
 - [ ] Write `CONTRIBUTING.md` and a short README "How it works" section linking the SRS.
@@ -201,6 +201,7 @@ From [SRS 6.5](<docs/srs/6. Other Requirements.md#65-known-limitations-and-open-
 - **typescript-eslint supports TypeScript only below 6.1.** TypeScript 7 (the native port) is out, but stay on `typescript ~6.0` until typescript-eslint supports it.
 - Node 25+ no longer bundles corepack, so `packageManager` in `package.json` isn't enforced automatically. CI uses `pnpm/action-setup`, which reads it.
 - Vitest 5: `passWithNoTests` is a root-only option; per-project configs (`defineProject`) reject it.
+- Property tests (fast-check) over wide ranges almost never produce equal values. To exercise tie-breaks, also run them with small domains (see `collidingHlcArb` in the HLC tests).
 - Workspace packages export their TypeScript source (`"exports": "./src/index.ts"`). Bundlers and Vitest handle this directly, and the base tsconfig uses `erasableSyntaxOnly`, so Node 26 can run the source with built-in type stripping. Revisit if a package is ever published to npm.
 
 ### MV3 and extension lifecycle
@@ -226,6 +227,8 @@ From [SRS 6.5](<docs/srs/6. Other Requirements.md#65-known-limitations-and-open-
 - **Events are not truth:** events are lost while the extension is asleep or the browser is closed, and vendor sync can change bookmarks behind your back. Diff against the mirror.
 - Save the last `seq` only **after** applying the batch, or a crash will skip records forever.
 - Clock skew affects HLC ordering. Warn when the local clock differs from the server's `Date` header by more than 5 minutes.
+- `hlc.receive` throws `HlcDriftError` for a remote stamp more than 24 h in the future. The engine must catch it, keep its own clock unchanged, still apply the record, and show a warning. Never adopt the remote time, or one broken clock drags every device into the future.
+- The serialized HLC format (SRS 4.4) is stored in every record. Changing it needs a migration, like the URL normalization rules.
 - Tombstones expire after 90 days, so a device offline longer than that must do a full reconcile, not an incremental pull.
 - Don't put the merge in the server "for performance". See rule 1.
 
