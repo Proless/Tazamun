@@ -29,10 +29,19 @@ Read this before changing anything in `packages/core`. The repository-wide rules
 ### Crypto
 - Never reuse a nonce: a fresh random 96-bit nonce for every encryption, including re-pushes of the same record.
 - Always bind AAD (`accountId | collection | recordId`) and **check it on decrypt**, or a malicious server can swap records.
-- Don't build your own crypto primitives. Use Web Crypto plus one audited Argon2 WASM library.
+- Don't build your own crypto primitives. Use Web Crypto, plus `hash-wasm` for Argon2id only. No audited WASM Argon2id existed when it was chosen ([ADR-0008](../../docs/adr/0008-crypto-implementation.md)); it's held to the reference vectors instead.
+- The details in ADR-0008 (NFC passphrases, KDF parameter floor, wrap AAD, empty HKDF salt, 16-byte keyed IDs) are format v1. `test/vectors/tazamun-format-v1.json` pins them. If a format test fails, you changed stored data: revert, or plan a migration and a new ADR.
+- **Copy test vectors from their source, never from memory.** One RFC 4231 MAC typed from memory was wrong. Each vector file names its source URL.
+- Only `seal` may create nonces. `sealWithNonce` exists for vectors; never call it in app code.
+- Decryption errors are a bare `DecryptError` on purpose. Don't add detail (which check failed, which key): it helps an attacker and can leak data into logs.
 - Argon2id with 64 MiB is slow on purpose (about 0.5–1 s). Expose it so callers run it only at sign-in and unlock, never per sync.
-- Commit test vectors (RFC 9106 for Argon2id, RFC 5869 for HKDF, NIST for AES-GCM) under `test/vectors/`.
+- Test vectors live in `test/vectors/`: Argon2id from the reference implementation's `test.c` (RFC 9106's own vector needs associated data, which `hash-wasm` doesn't support), HKDF from RFC 5869, HMAC from RFC 4231, AES-GCM from Wycheproof.
+
+### TypeScript and Web Crypto
+- The base tsconfig has no DOM lib, so names like `AesKeyGenParams` or `KeyUsage` don't exist. Take types from the API itself: `Parameters<typeof crypto.subtle.deriveKey>[2]`.
+- Web Crypto wants `Uint8Array<ArrayBuffer>`, not plain `Uint8Array` (which may be backed by a `SharedArrayBuffer`). Return `Uint8Array<ArrayBuffer>` from helpers that produce bytes for Web Crypto.
 
 ### Testing
+- Every test runs twice: in Node (`pnpm test`) and in Chromium and Firefox (`pnpm test:browser`, through `vitest.browser.config.ts`). Don't use Node-only APIs (`Buffer`, `node:*`) in tests either.
 - Property tests over wide ranges almost never produce equal values. To exercise tie-breaks, also run them with small domains (see `collidingHlcArb` in `hlc.test.ts`).
 - `fc.pre` discards runs. If a precondition rejects most inputs, narrow the arbitrary instead.

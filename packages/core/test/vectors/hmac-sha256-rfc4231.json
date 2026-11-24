@@ -1,0 +1,18 @@
+{
+  "source": "RFC 4231, section 4, test cases 2 and 3 (HMAC-SHA-256)",
+  "url": "https://www.rfc-editor.org/rfc/rfc4231",
+  "tests": [
+    {
+      "case": 2,
+      "key": "4a656665",
+      "data": "7768617420646f2079612077616e7420666f72206e6f7468696e673f",
+      "mac": "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
+    },
+    {
+      "case": 3,
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "data": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "mac": "773ea91e36800e46854db8ebd09181a72959098b3ef8c122d9635514ced565fe"
+    }
+  ]
+}
