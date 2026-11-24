@@ -26,8 +26,9 @@ pnpm --filter @tazamun/core exec playwright install chromium firefox   # once, f
 | `pnpm typecheck` | TypeScript in every package |
 | `pnpm format` | Format with Prettier (`pnpm format:check` only checks) |
 | `pnpm licenses:check` | Check dependency licenses |
+| `pnpm --filter @tazamun/server dev` | Run the server locally ([apps/server/README.md](apps/server/README.md)) |
 
-CI runs all of these on every pull request.
+CI runs all of these except `dev` on every pull request.
 
 ## Rules every change must follow
 

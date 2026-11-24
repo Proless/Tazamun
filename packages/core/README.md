@@ -5,7 +5,7 @@ The shared library of Tazamun: everything that the extension, the dashboard and 
 | Module | Status | What it does |
 | ------ | ------ | ------------ |
 | `hlc` | Done | Hybrid Logical Clock: orders edits across devices (ENG-7, [ADR-0003](../../docs/adr/0003-sync-protocol-records-hlc.md)) |
-| `schema` | Done for `tabs`, `commands`, `history`, `extensions` | Wire format of the HTTP API, and decrypted payload schemas per collection (zod) ([SRS 4.4](<../../docs/srs/4. External Interface Requirements.md#44-communications-interfaces>)). `bookmarks` follows in P4, `devices` after Q2. |
+| `schema` | Done for `tabs`, `commands`, `history`, `extensions` | Wire format of the HTTP API (records, plus account, session, key, device and info bodies and the error codes), and decrypted payload schemas per collection (zod) ([SRS 4.4](<../../docs/srs/4. External Interface Requirements.md#44-communications-interfaces>)). `bookmarks` follows in P4, `devices` after Q2. |
 | `crypto` | Done | Argon2id key derivation, account-key wrapping, HKDF collection keys, AES-GCM payload encryption with AAD, keyed history IDs ([SRS 5.2](<../../docs/srs/5. Other Nonfunctional Requirements.md#52-security-requirements>), [ADR-0008](../../docs/adr/0008-crypto-implementation.md)) |
 | merge functions | P1+ | One pure merge function per data type |
 | API client | P1 | Typed client for the HTTP API |
@@ -126,7 +126,8 @@ src/
   hlc/            hlc.ts, hlc.test.ts, index.ts
   schema/
     primitives.ts record ID, device ID, HLC stamp, timestamps, base64url
-    envelope.ts   HTTP API wire format (records, pull, push, errors, limits)
+    envelope.ts   HTTP API wire format for records (pull, push, errors, limits)
+    api.ts        HTTP API bodies for accounts, prelogin, sessions, keys, devices, info; ERROR_CODES
     payload.ts    decrypted payload {v, deleted, hlc, data}, decodePayload, versioning
     collections/  one file per collection: tabs, commands, history, extensions
 test/vectors/

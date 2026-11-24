@@ -4,7 +4,7 @@
 
 Tazamun syncs **tabs, history, bookmarks and your extension list** between browsers from different vendors. It replaces a separate tab manager, history tool and bookmark syncer, each with its own account. Your data is encrypted on your devices; the server only ever stores ciphertext, and you can run that server yourself.
 
-> **Status:** early development. P0 (foundations) is done: the shared core library with the clock, record schemas and encryption is built and tested. P1 (server, sync engine, accounts and tabs) is next. Nothing is usable yet. See the [roadmap](CLAUDE.md#roadmap).
+> **Status:** early development. P0 (foundations) is done: the shared core library with the clock, record schemas and encryption is built and tested. P1 (server, sync engine, accounts and tabs) is in progress: the server API is built; the extension is not yet. Nothing is usable yet. See the [roadmap](CLAUDE.md#roadmap).
 
 ## How it works
 
@@ -22,7 +22,7 @@ Details: [architecture](<docs/srs/2. Overall Description.md#22-architecture>), [
 | [packages/core](packages/core/README.md) | Shared library: Hybrid Logical Clock, record schemas, encryption. Merge functions and the API client follow in P1. |
 | `packages/ui` | Shared Vue components (planned) |
 | `apps/extension` | Browser extension for Chrome, Edge and Firefox (planned, P1) |
-| `apps/server` | Sync server and dashboard host, built on Hono and `node:sqlite` (planned, P1) |
+| [apps/server](apps/server/README.md) | Sync server: HTTP API, accounts, encrypted record storage. Built on Hono and `node:sqlite`. Serves the dashboard from P3. |
 | `apps/dashboard` | Web dashboard (planned, P3) |
 | `deploy/` | Docker image, Compose files, reverse-proxy examples (planned, P1) |
 | [docs](docs/README.md) | Requirements (SRS) and architecture decisions (ADRs) |
