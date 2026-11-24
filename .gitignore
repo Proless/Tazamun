@@ -1,2 +1,106 @@
+# Tazamun .gitignore
+# Planned stack: pnpm TypeScript monorepo (WXT extension, Node server, Vue/Vite dashboard), SQLite, Docker.
+
+# --- Project-specific (kept from earlier) ---
 .artifacts/
 .private/
+
+# --- Dependencies ---
+node_modules/
+.pnpm-store/
+
+# --- Build output ---
+dist/
+build/
+*.tsbuildinfo
+
+# WXT (browser extension): build output, generated types, store zips
+.output/
+.wxt/
+*.zip
+*.xpi
+*.crx
+
+# Vite
+*.local
+.vite/
+
+# --- Tests and coverage ---
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# --- Caches ---
+.cache/
+.eslintcache
+.stylelintcache
+.prettiercache
+.turbo/
+.parcel-cache/
+
+# --- Logs ---
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Environment and secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# --- Local server data (SQLite, backups, Docker volumes) ---
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+/data-local/
+/backups/
+# Note: the top-level data/ folder holds committed community data (extension-equivalents.json),
+# so only database files inside it are ignored.
+
+# Docker Compose overrides for local setups
+docker-compose.override.yml
+compose.override.yml
+
+# --- Editors and IDEs ---
+# Visual Studio (no longer used, but the folder may still exist locally)
+.vs/
+*.suo
+*.user
+
+# VS Code: ignore personal settings, keep shared recommendations
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+
+# JetBrains (WebStorm, Rider, IntelliJ)
+.idea/
+
+# Vim / Emacs
+*.swp
+*.swo
+*~
+\#*\#
+
+# --- Claude Code: personal settings only (shared settings may be committed) ---
+.claude/settings.local.json
+
+# --- Operating systems ---
+.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

@@ -11,7 +11,7 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 ## Current status
 
 - **Phase:** P0 (foundations). **No code exists yet**; the repository contains only the SRS and ADRs.
-- The SRS was rewritten on 2026-11-24 (revision 2). `srs/assets/*.png` show the **superseded** revision-1 design (server-side merge) and are no longer referenced. Don't use them as a reference.
+- The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<srs/2. Overall Description.md#22-architecture>), [2.3](<srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
 ## Sources of truth
