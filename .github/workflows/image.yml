@@ -77,6 +77,8 @@ jobs:
         with:
           image: tazamun:ci
           fail-build: false
+          # Only affects the action's own warning; the summary lists every severity.
+          severity-cutoff: critical
           output-format: json
       - name: Scan summary
         if: matrix.arch == 'amd64'

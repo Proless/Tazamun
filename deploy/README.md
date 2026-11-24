@@ -27,7 +27,7 @@ With `localhost`, Caddy uses its own local certificate authority, hence `-k`. On
 ## The image
 
 - **Build stage:** installs the workspace with pnpm and bundles the server with esbuild (`pnpm --filter @tazamun/server build`) into `dist/main.js`, plus `THIRD-PARTY-LICENSES.txt`. It runs on the build machine's platform (`--platform=$BUILDPLATFORM`), because its output is plain JavaScript; a multi-arch build compiles nothing under emulation.
-- **Runtime stage:** `node:26-alpine`, pinned by digest, with npm removed. It holds `/app/main.js`, linked as `/usr/local/bin/tazamun`, plus the license files.
+- **Runtime stage:** `node:26-alpine`, pinned by digest, with `apk upgrade` (Alpine ships security fixes before the Node image is rebuilt) and npm removed. It holds `/app/main.js`, linked as `/usr/local/bin/tazamun`, plus the license files.
 - **Runs as** UID/GID 10001 with a read-only root filesystem. `/data` is the only volume. Port 8080.
 - **`ENTRYPOINT ["tazamun"]`, `CMD ["serve"]`:** `docker run <image> invite list` runs an admin command. Node is PID 1 and handles SIGTERM itself (DEP-7).
 - **`HEALTHCHECK`** runs `tazamun healthcheck`; there's no curl in the image.
