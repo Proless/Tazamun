@@ -10,7 +10,7 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 
 ## Current status
 
-- **Phase:** P0 (foundations). The pnpm workspace, tooling and CI are set up; `packages/core` exists but is still empty.
+- **Phase:** P0 (foundations). Workspace, tooling and CI are set up. `packages/core` has the HLC and the record schemas; crypto is next.
 - The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
@@ -98,7 +98,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 - [ ] Renovate or Dependabot configured for npm, GitHub Actions and Docker base-image digests (DEP-37). *(npm and Actions done; add Docker when the Dockerfile lands.)*
 - [ ] `packages/core/crypto`: Argon2id (WASM), HKDF, AES-GCM wrap and unwrap, payload encrypt and decrypt with AAD. **Test vectors** committed.
 - [x] `packages/core/hlc`: HLC with tests (monotonic, clock skew, comparison including device ID).
-- [ ] `packages/core/schema`: record envelope plus a payload schema per collection (zod), with schema versions.
+- [x] `packages/core/schema`: record envelope plus a payload schema per collection (zod), with schema versions. *(`bookmarks` follows in P4 and `devices` after Q2.)*
 - [ ] Settle Q1 (server framework and SQLite driver) and record it in ADR-0004.
 - [ ] Write `CONTRIBUTING.md` and a short README "How it works" section linking the SRS.
 
