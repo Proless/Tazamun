@@ -65,6 +65,7 @@ Run from the repository root:
 | `pnpm --filter @tazamun/server dev` | Start the server with `.env`, restarting on changes |
 | `pnpm --filter @tazamun/server tazamun <command>` | Run an admin command with `.env` |
 | `pnpm --filter @tazamun/server build` | Bundle into `dist/main.js` with `dist/THIRD-PARTY-LICENSES.txt`, as the image runs it |
+| `pnpm --filter @tazamun/server smoke <image>` | Container smoke test against a built image (DEP-29; see [deploy/README.md](../../deploy/README.md#ci-pipeline)) |
 | `pnpm --filter @tazamun/server typecheck` | Type-check this package |
 | `pnpm --filter @tazamun/server config:docs` | Regenerate [`docs/guides/server-configuration.md`](../../docs/guides/server-configuration.md). A test fails if it's out of date. |
 | `pnpm test --project server` | Run this package's tests |
@@ -109,6 +110,7 @@ src/
     collections.ts   pull and push
 test/
   harness.ts         in-memory app with a fake clock and captured logs
+  smoke.ts           container smoke test: runs a built image and drives it like a client
 .env.example         development settings
 build.ts             production bundle and third-party license file (dist/)
 ```

@@ -1,0 +1,167 @@
+# Container image pipeline (DEP-28…30, DEP-33, DEP-34, DEP-38, ADR-0007).
+#
+# - Every pull request and push: build the image for amd64 and arm64, run the container smoke
+#   test on each (DEP-29), and scan it for vulnerabilities (DEP-34).
+# - Push to main: publish ghcr.io/proless/tazamun:edge and :sha-<short sha> for both
+#   architectures (DEP-30). CI is the only publisher (DEP-28).
+#
+# Third-party actions are pinned by commit SHA; Dependabot updates the pins.
+
+name: Image
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-${{ github.ref }}
+  # Cancel superseded PR runs, but let publishes on main finish in order, so `edge` never goes
+  # back to an older commit.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE: ghcr.io/proless/tazamun
+
+jobs:
+  test:
+    name: Build and smoke-test (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      # The smoke test runs on the runner and uses @tazamun/core as a client would.
+      - run: pnpm install --frozen-lockfile
+
+      # arm64 runs under QEMU. The Dockerfile's build stage runs on the runner's own platform,
+      # so only the runtime stage and the container itself are emulated.
+      - if: matrix.arch == 'arm64'
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: tazamun:ci
+          cache-from: type=gha,scope=image-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=image-${{ matrix.arch }}
+
+      - name: Image size
+        run: |
+          size=$(docker image inspect tazamun:ci --format '{{.Size}}')
+          echo "Uncompressed image size (${{ matrix.arch }}): $((size / 1024 / 1024)) MiB" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke test (DEP-29)
+        run: pnpm --filter @tazamun/server smoke tazamun:ci
+
+      # DEP-34. The OS packages are the same on both architectures, so one scan is enough.
+      - name: Scan
+        if: matrix.arch == 'amd64'
+        id: scan
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          image: tazamun:ci
+          fail-build: false
+          # Only affects the action's own warning; the summary lists every severity.
+          severity-cutoff: critical
+          output-format: json
+      - name: Scan summary
+        if: matrix.arch == 'amd64'
+        env:
+          REPORT: ${{ steps.scan.outputs.json }}
+        run: node scripts/scan-summary.ts "$REPORT"
+      # Code scanning needs GitHub Advanced Security on private repositories, so results go there
+      # once the repository is public. Pull requests from forks can't upload either.
+      - name: Scan (SARIF)
+        if: matrix.arch == 'amd64' && !github.event.repository.private && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+        id: sarif
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          image: tazamun:ci
+          fail-build: false
+          output-format: sarif
+      - name: Upload to code scanning
+        if: steps.sarif.outcome == 'success'
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: ${{ steps.sarif.outputs.sarif }}
+          category: container-image
+
+  publish:
+    name: Publish edge
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # DEP-38: only what publishing needs. Signing (id-token) comes with releases in P6.
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Version
+        id: version
+        run: |
+          short=$(git rev-parse --short=7 HEAD)
+          {
+            echo "short=$short"
+            echo "version=$(node -p 'require("./apps/server/package.json").version')-edge.$short"
+            echo "created=$(git log -1 --format=%cI)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:edge
+            ${{ env.IMAGE }}:sha-${{ steps.version.outputs.short }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            REVISION=${{ github.sha }}
+            CREATED=${{ steps.version.outputs.created }}
+          cache-from: |
+            type=gha,scope=image-amd64
+            type=gha,scope=image-arm64
+
+      - name: Check the published image
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          docker buildx imagetools inspect "$IMAGE@$DIGEST"
+          for platform in linux/amd64 linux/arm64; do
+            docker run --rm --platform "$platform" "$IMAGE@$DIGEST" version
+          done
+          {
+            echo "### Published"
+            echo ""
+            echo "- \`$IMAGE:edge\`"
+            echo "- \`$IMAGE:sha-${{ steps.version.outputs.short }}\`"
+            echo "- Digest \`$DIGEST\`, version \`${{ steps.version.outputs.version }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

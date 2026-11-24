@@ -34,9 +34,12 @@ RUN pnpm --filter @tazamun/server build
 # Only Node and one bundled file (DEP-2): no package manager, no node_modules, no source.
 FROM ${NODE_IMAGE} AS runtime
 
+# Alpine publishes security fixes faster than the Node image is rebuilt (zlib, OpenSSL), so take
+# them here; the scan (DEP-34) would otherwise flag fixed vulnerabilities.
 # npm and npx aren't needed at run time and are a common source of scanner findings.
 # UID/GID 10001 is fixed and documented (DEP-3); /data is the only writable path (DEP-4).
-RUN rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx \
+RUN apk upgrade --no-cache \
+ && rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx \
       /usr/local/bin/docker-entrypoint.sh \
  && addgroup -S -g 10001 tazamun \
  && adduser -S -D -H -u 10001 -G tazamun -s /sbin/nologin tazamun \
