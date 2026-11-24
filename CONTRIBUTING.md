@@ -27,8 +27,9 @@ pnpm --filter @tazamun/core exec playwright install chromium firefox   # once, f
 | `pnpm format` | Format with Prettier (`pnpm format:check` only checks) |
 | `pnpm licenses:check` | Check dependency licenses |
 | `pnpm --filter @tazamun/server dev` | Run the server locally ([apps/server/README.md](apps/server/README.md)) |
+| `pnpm --filter @tazamun/server tazamun <command>` | Run an admin command, such as `invite create` |
 
-CI runs all of these except `dev` on every pull request.
+CI runs all of these except the two server commands on every pull request.
 
 ## Rules every change must follow
 

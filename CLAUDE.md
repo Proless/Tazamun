@@ -11,7 +11,7 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 ## Current status
 
 - **Phase:** P1 (engine, server, accounts, tabs). P0's exit criteria are met: workspace, tooling and CI are set up, and `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Q1 is decided: Hono and `node:sqlite`. The one open P0 item, Dependabot for Docker base images, lands with the Dockerfile in P1.
-- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations; see [apps/server/README.md](apps/server/README.md)), `scripts/`, `docs/`, `.github/`. Next: the admin CLI and backups, then the container image.
+- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `scripts/`, `docs/`, `.github/`. Next: the container image and Compose files.
 - The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
@@ -93,6 +93,7 @@ Commands (Node 26, pnpm 12; install pnpm with `npm install -g pnpm`, since Node 
 | `pnpm format` / `pnpm format:check` | Prettier write / check |
 | `pnpm licenses:check` | Dependency license policy ([scripts/README.md](scripts/README.md)) |
 | `pnpm --filter @tazamun/server dev` | Run the server locally (copy `apps/server/.env.example` to `.env` first) |
+| `pnpm --filter @tazamun/server tazamun <command>` | Admin commands: invites, backup, restore, accounts ([apps/server/README.md](apps/server/README.md#admin-commands)) |
 
 Still to come: `pnpm --filter extension dev`, `docker compose up`.
 
@@ -117,9 +118,9 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 
 ### P1: Engine, server, accounts, tabs (4–6 weeks): first usable version
 
-- [ ] **Server:** accounts, prelogin, sessions, devices, collections (pull and push), `/v1/info`, `/v1/health`, quotas, rate limits, registration modes and invite CLI, migrations (ADM-1…4, ADM-7). *(All done except the invite CLI, which comes with the admin CLI.)*
+- [x] **Server:** accounts, prelogin, sessions, devices, collections (pull and push), `/v1/info`, `/v1/health`, quotas, rate limits, registration modes and invite CLI, migrations (ADM-1…4, ADM-7).
 - [x] **Server config:** one validated schema for `TAZAMUN_*` variables, `*_FILE` secrets, the `TAZAMUN_PUBLIC_URL` HTTPS check, a config reference generated from the schema (DEP-12…15).
-- [ ] **Admin CLI:** `invite`, `backup`, `restore`, `migrate --status`, `accounts`, `version`, `healthcheck` (DEP-16). Automatic backup before migrating (DEP-24, DEP-25). *(The pre-migration backup and the online backup function are done.)*
+- [x] **Admin CLI:** `invite`, `backup`, `restore`, `migrate --status`, `accounts`, `version`, `healthcheck` (DEP-16). Automatic backup before migrating (DEP-24, DEP-25).
 - [ ] **Container image:** multi-stage Dockerfile, non-root UID 10001, read-only root filesystem, `/data` volume, `HEALTHCHECK`, correct signal handling, JSON logs, OCI labels, instance secret generated on first start (DEP-1…11).
 - [ ] **Compose files:** `docker-compose.yml` and `docker-compose.caddy.yml` with `.env.example` and resource limits. Reverse-proxy docs for Caddy, Traefik and nginx. Warning about local storage and a single instance (DEP-17…19, DEP-22).
 - [ ] **CI image pipeline:** build on every PR plus a container smoke test (health, API suite, SIGTERM, restart persistence); vulnerability scan; multi-arch with Buildx; publish `edge` and `sha-*` to GHCR from `main` with minimal token permissions (DEP-28…30, DEP-33, DEP-34, DEP-38).

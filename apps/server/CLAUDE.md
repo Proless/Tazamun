@@ -11,7 +11,8 @@ Read this before changing anything in `apps/server`. The repository-wide rules i
 5. **Logging goes through `src/log.ts` only**, whose `LogFields` type is the allow-list. Never log bodies, headers, concrete paths (they contain account and device IDs), tokens, auth keys, device names or record IDs (ADM-7). Log `routePath(c, -1)`, the route pattern, instead of the path. A test checks that none of these values appear in logs; extend it when you add a route.
 6. **Error messages never echo request values.** Validation errors name the field path and the zod issue code only (`src/http/validate.ts`). Config errors may echo non-secret values to help with typos, never secrets.
 7. **Every setting is one entry in `SETTINGS`** (`src/config.ts`). Its key is the config-file key and its `env` the variable name; renaming either breaks existing deployments, so treat both as stable. The reference in `docs/guides/server-configuration.md` is generated from it. After changing a setting, run `pnpm --filter @tazamun/server config:docs`; `config.test.ts` fails otherwise (DEP-15).
-8. **Inject time and services.** Routes take `now()` and other services from `Services`, so tests control the clock. No module-level state other than what `main.ts` builds.
+8. **Inject time and services.** Routes take `now()` and other services from `Services`, and CLI commands take everything from `CliIo`, so tests control the clock, output and network. No module-level state other than what `main.ts` and `serve.ts` build.
+9. **Admin commands never migrate, and never destroy data without a copy.** They open the database with `mode: 'require-current'`, so a CLI never changes the schema under a running server. Anything that deletes or replaces data (`accounts delete`, `restore`) writes a backup first (rule 6).
 
 ## Pitfalls
 
@@ -41,6 +42,15 @@ Read this before changing anything in `apps/server`. The repository-wide rules i
 - `prelogin` for unknown IDs must look exactly like a real response: the same shape, default parameters, and a salt derived from the instance secret so repeated queries agree (SEC-9).
 - With `TAZAMUN_TRUST_PROXY`, the client IP is the **last** `X-Forwarded-For` entry, the one our own proxy added. Earlier entries come from the client and can be forged.
 - Never log request bodies. History record IDs in logs reveal browsing patterns over time.
+
+### Admin CLI
+- Opening a database normally switches it to WAL and checkpoints on close, which **writes to the file**. Open files that must stay untouched (a backup being verified or restored) with `readOnly: true`.
+- `restore` replaces `tazamun.db` and deletes its `-wal` and `-shm` files. A leftover WAL from the old database would be replayed into the restored one.
+- `restore` can only check that no server answers on the configured port; it can't see a server on another port or in another container. The docs must say to stop the server first.
+- **`seq` must not go backwards after a restore.** `Database.restore` raises each account's `last_seq` to at least its value in the replaced database; otherwise devices that had pulled further would skip new records.
+- Still open: after a restore, devices don't re-download records that the restore set back to older versions, because their `seq` is below what the devices have seen. The engine needs a signal to do a full reconcile, for example a data generation in `/v1/info` that changes on restore. Decide this with the engine (ENG-6, ADR-0003).
+- Invite tokens are printed once, at creation; the database holds only their hash. Invite IDs are hex, so an ID never starts with `-` and gets parsed as an option.
+- CLI output is for people and goes to stdout and stderr directly, not through the logger. It may show account IDs (operators need them), but never content, and no token other than a newly created invite.
 
 ### Running and testing
 - Node runs the TypeScript source directly (type stripping), including `@tazamun/core` through the workspace link. This works because pnpm's symlink resolves to `packages/core`, outside `node_modules`; Node refuses to strip types from files under `node_modules`. Don't enable `--preserve-symlinks`.

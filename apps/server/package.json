@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "node --watch --env-file-if-exists=.env src/main.ts",
     "start": "node src/main.ts",
+    "tazamun": "node --env-file-if-exists=.env src/main.ts",
     "typecheck": "tsc --noEmit",
     "config:docs": "node src/config-docs.ts"
   },

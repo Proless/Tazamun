@@ -7,7 +7,7 @@
  * transaction (REL-4). `seq` is assigned inside the write transaction, so it has no gaps or
  * duplicates.
  */
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
 import type { schema } from '@tazamun/core';
@@ -32,7 +32,47 @@ export class DatabaseTooNewError extends Error {
   }
 }
 
+/** A backup to restore failed `PRAGMA integrity_check`. */
+export class BackupInvalidError extends Error {
+  constructor(path: string) {
+    super(`The backup at ${path} failed PRAGMA integrity_check; nothing was changed.`);
+    this.name = 'BackupInvalidError';
+  }
+}
+
+/** An admin command found a database that the server hasn't migrated yet. */
+export class DatabaseNotMigratedError extends Error {
+  readonly found: number;
+  readonly expected: number;
+
+  constructor(found: number, expected: number) {
+    super(
+      `The database has schema version ${String(found)}, but this version of Tazamun expects ${String(expected)}. ` +
+        'Start the server once to migrate it, then run this command again.',
+    );
+    this.name = 'DatabaseNotMigratedError';
+    this.found = found;
+    this.expected = expected;
+  }
+}
+
+/**
+ * What `Database.open` does about the schema version:
+ * - `migrate` (the server): migrate to the latest version, refuse newer databases.
+ * - `require-current` (admin commands): refuse anything but the latest version, never migrate,
+ *   so a CLI never changes the schema under a running server.
+ * - `inspect` (`migrate --status`): open any version as it is.
+ */
+export type OpenMode = 'migrate' | 'require-current' | 'inspect';
+
 export interface OpenOptions {
+  /** Default `migrate`. */
+  readonly mode?: OpenMode;
+  /**
+   * Open without writing anything: no WAL switch, no checkpoint on close. Use it for files that
+   * must stay untouched, such as a backup being verified. Implies a mode other than `migrate`.
+   */
+  readonly readOnly?: boolean;
   /** Directory for pre-migration backups (DEP-24). Omit for in-memory test databases. */
   readonly backupDir?: string;
   /** Override for tests; defaults to the real migrations. */
@@ -52,6 +92,14 @@ export interface AccountRow {
   readonly createdAt: number;
   readonly lastSeenAt: number;
   readonly storageBytes: number;
+}
+
+export interface AccountSummary {
+  readonly id: string;
+  readonly createdAt: number;
+  readonly lastSeenAt: number;
+  readonly storageBytes: number;
+  readonly devices: number;
 }
 
 export interface NewAccount {
@@ -149,9 +197,11 @@ class Rollback extends Error {}
 export class Database {
   readonly #db: DatabaseSync;
   readonly #statements = new Map<string, StatementSync>();
+  readonly #readOnly: boolean;
 
-  private constructor(db: DatabaseSync) {
+  private constructor(db: DatabaseSync, readOnly: boolean) {
     this.#db = db;
+    this.#readOnly = readOnly;
   }
 
   /**
@@ -161,14 +211,27 @@ export class Database {
    */
   static open(path: string, options: OpenOptions = {}): Database {
     const migrations = options.migrations ?? MIGRATIONS;
-    const raw = new DatabaseSync(path);
+    const readOnly = options.readOnly ?? false;
+    const mode = options.mode ?? 'migrate';
+    if (readOnly && mode === 'migrate') throw new RangeError('A read-only database cannot migrate');
+    const raw = new DatabaseSync(path, { readOnly });
     try {
-      raw.exec('PRAGMA journal_mode = WAL');
-      raw.exec('PRAGMA synchronous = NORMAL');
-      raw.exec('PRAGMA foreign_keys = ON');
+      if (!readOnly) {
+        raw.exec('PRAGMA journal_mode = WAL');
+        raw.exec('PRAGMA synchronous = NORMAL');
+        raw.exec('PRAGMA foreign_keys = ON');
+      }
       raw.exec('PRAGMA busy_timeout = 5000');
-      const db = new Database(raw);
-      db.#migrate(migrations, options);
+      const db = new Database(raw, readOnly);
+      if (mode === 'migrate') {
+        db.#migrate(migrations, options);
+      } else if (mode === 'require-current') {
+        const version = db.schemaVersion;
+        if (version > migrations.length) throw new DatabaseTooNewError(version, migrations.length);
+        if (version < migrations.length) {
+          throw new DatabaseNotMigratedError(version, migrations.length);
+        }
+      }
       return db;
     } catch (err) {
       raw.close();
@@ -215,8 +278,80 @@ export class Database {
   /** Checkpoint the WAL into the main file and close (DEP-7). */
   close(): void {
     if (!this.#db.isOpen) return;
-    this.#db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    if (!this.#readOnly) this.#db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
     this.#db.close();
+  }
+
+  /** `PRAGMA integrity_check`: true when SQLite reports `ok` (DEP-25). */
+  integrityOk(): boolean {
+    const rows = this.#all('PRAGMA integrity_check');
+    return rows.length === 1 && rows[0]?.['integrity_check'] === 'ok';
+  }
+
+  /**
+   * Replace the database file at `dbPath` with the backup at `backupPath` (DEP-25). The server
+   * must be stopped. The backup must pass `integrity_check` and have a schema version this server
+   * supports. The current database is first copied to `safetyCopyPath`, so a restore never
+   * destroys data without a recoverable copy (rule 6). Returns the backup's schema version.
+   */
+  static restore(dbPath: string, backupPath: string, safetyCopyPath: string): number {
+    const version = Database.#verifyBackup(backupPath);
+    let seqFloors: Row[] = [];
+    if (existsSync(dbPath)) {
+      const current = Database.open(dbPath, { mode: 'inspect', readOnly: true });
+      try {
+        current.backupTo(safetyCopyPath);
+        if (current.schemaVersion > 0)
+          seqFloors = current.#all('SELECT id, last_seq FROM accounts');
+      } finally {
+        current.close();
+      }
+    }
+    // The WAL and shared-memory files belong to the old database; a stale WAL would be replayed
+    // into the restored file.
+    for (const suffix of ['', '-wal', '-shm']) rmSync(dbPath + suffix, { force: true });
+    copyFileSync(backupPath, dbPath);
+
+    // `seq` must never go backwards (ADR-0003): devices have pulled up to the replaced database's
+    // counters, and would skip new records numbered below them. Keep each account's counter at
+    // least as high as it was.
+    if (seqFloors.length > 0 && version > 0) {
+      const restored = Database.open(dbPath, { mode: 'inspect' });
+      try {
+        restored.transaction(() => {
+          for (const row of seqFloors) {
+            restored.#run(
+              'UPDATE accounts SET last_seq = MAX(last_seq, ?) WHERE id = ?',
+              num(row, 'last_seq'),
+              str(row, 'id'),
+            );
+          }
+        });
+      } finally {
+        restored.close();
+      }
+    }
+    return version;
+  }
+
+  /**
+   * The schema version of a backup file, after checking it. Anything that isn't an intact SQLite
+   * database (a truncated copy, the wrong file) is a BackupInvalidError.
+   */
+  static #verifyBackup(path: string): number {
+    let backup: Database | undefined;
+    try {
+      backup = Database.open(path, { mode: 'inspect', readOnly: true });
+      if (!backup.integrityOk()) throw new BackupInvalidError(path);
+      const version = backup.schemaVersion;
+      if (version > MIGRATIONS.length) throw new DatabaseTooNewError(version, MIGRATIONS.length);
+      return version;
+    } catch (err) {
+      if (err instanceof BackupInvalidError || err instanceof DatabaseTooNewError) throw err;
+      throw new BackupInvalidError(path);
+    } finally {
+      backup?.close();
+    }
   }
 
   /** Throws if the database can't answer a query (used by /v1/health). */
@@ -341,6 +476,21 @@ export class Database {
         keepSessionHash,
       );
     });
+  }
+
+  /** Metadata of every account, for `tazamun accounts list` (DEP-16). Never content. */
+  listAccounts(): AccountSummary[] {
+    return this.#all(
+      `SELECT a.id, a.created_at, a.last_seen_at, a.storage_bytes,
+              (SELECT COUNT(*) FROM devices d WHERE d.account_id = a.id) AS devices
+       FROM accounts a ORDER BY a.created_at, a.id`,
+    ).map((row) => ({
+      id: str(row, 'id'),
+      createdAt: num(row, 'created_at'),
+      lastSeenAt: num(row, 'last_seen_at'),
+      storageBytes: num(row, 'storage_bytes'),
+      devices: num(row, 'devices'),
+    }));
   }
 
   // ---- Invites -------------------------------------------------------------------------------
@@ -640,7 +790,7 @@ function deviceRow(row: Row): DeviceRow {
 }
 
 /** Keep the newest `keep` files in `dir` whose names start with `prefix`. */
-function pruneBackups(dir: string, prefix: string, keep: number): void {
+export function pruneBackups(dir: string, prefix: string, keep: number): void {
   const files = readdirSync(dir)
     .filter((name) => name.startsWith(prefix))
     .map((name) => ({ path: join(dir, name), mtime: statSync(join(dir, name)).mtimeMs }))
