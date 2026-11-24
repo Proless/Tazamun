@@ -164,6 +164,11 @@ export function serialize(hlc: Hlc): string {
   return `${wall}:${counter}:${hlc.deviceId}`;
 }
 
+/** Whether `value` has the exact shape `serialize` produces. */
+export function isSerializedHlc(value: string): boolean {
+  return SERIALIZED_PATTERN.test(value);
+}
+
 /** Decode a stamp produced by `serialize`. Throws RangeError for anything else. */
 export function parse(value: string): Hlc {
   const match = SERIALIZED_PATTERN.exec(value);

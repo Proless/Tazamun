@@ -11,6 +11,7 @@ import {
   compare,
   createHlc,
   isClockSkewed,
+  isSerializedHlc,
   parse,
   receive,
   serialize,
@@ -260,5 +261,17 @@ describe('isClockSkewed', () => {
     expect(isClockSkewed(T - CLOCK_SKEW_WARNING_MS, T)).toBe(false);
     expect(isClockSkewed(T + CLOCK_SKEW_WARNING_MS + 1, T)).toBe(true);
     expect(isClockSkewed(T - CLOCK_SKEW_WARNING_MS - 1, T)).toBe(true);
+  });
+});
+
+describe('isSerializedHlc', () => {
+  it('matches exactly what serialize produces', () => {
+    fc.assert(
+      fc.property(hlcArb, (h) => {
+        expect(isSerializedHlc(serialize(h))).toBe(true);
+      }),
+    );
+    expect(isSerializedHlc('001795000000000:000000FF:a')).toBe(false);
+    expect(isSerializedHlc('')).toBe(false);
   });
 });

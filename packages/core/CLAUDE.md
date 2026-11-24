@@ -18,6 +18,14 @@ Read this before changing anything in `packages/core`. The repository-wide rules
 - `receive` throws `HlcDriftError` for a remote stamp more than 24 h in the future. The engine must catch it, keep its own clock unchanged, still apply the record, and show a warning. Never adopt the remote time, or one broken clock drags every device into the future.
 - The serialized HLC format (SRS 4.4) is stored in every record and sorts as a plain string. Changing it needs a migration.
 
+### Schemas
+- **Use `z.looseObject` for every object inside a payload**, never `z.object` (which strips unknown keys). A client that drops fields it doesn't know destroys data written by newer clients when it re-pushes after a merge. A test checks this for tabs; add the same check for each new collection.
+- `v` is a **major** version. Bump it only for breaking changes, and add a migration in `decodePayload` for the old version at the same time. Adding an optional field doesn't bump it.
+- Accept values browsers add over time (history transition types) as strings, not enums, or one new browser release makes records invalid. Use enums only for values Tazamun controls or that are stable (extension `kind`, `installType`).
+- `decodePayload` must never throw on input from the network, and its issues must hold paths and codes only, never values (rule 5). Both are tested; keep them that way.
+- **zod 4 compiles parsers with `new Function`** unless told not to. Extension pages and the dashboard (SEC-8 CSP) forbid `eval`, so each app must call `z.config({ jitless: true })` at startup, before any parse. Otherwise every page logs CSP violations.
+- Wire objects in `envelope.ts` use plain `z.object` on purpose: unknown fields from the server are dropped, and a client can't set `seq` or `modifiedAt` in a push.
+
 ### Crypto
 - Never reuse a nonce: a fresh random 96-bit nonce for every encryption, including re-pushes of the same record.
 - Always bind AAD (`accountId | collection | recordId`) and **check it on decrypt**, or a malicious server can swap records.
