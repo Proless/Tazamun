@@ -10,7 +10,7 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 
 ## Current status
 
-- **Phase:** P0 (foundations). Workspace, tooling and CI are set up. `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Left in P0: license check in CI, Q1, `CONTRIBUTING.md`.
+- **Phase:** P0 (foundations). Workspace, tooling and CI are set up. `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Left in P0: Q1.
 - The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
@@ -83,6 +83,7 @@ Commands (Node 26, pnpm 12; install pnpm with `npm install -g pnpm`, since Node 
 | `pnpm lint` | ESLint (type-aware) over the whole repo |
 | `pnpm typecheck` | `tsc --noEmit` in every package |
 | `pnpm format` / `pnpm format:check` | Prettier write / check |
+| `pnpm licenses:check` | Dependency license policy ([scripts/README.md](scripts/README.md)) |
 
 Still to come: `pnpm --filter extension dev`, `pnpm --filter server dev`, `docker compose up`.
 
@@ -95,13 +96,13 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 ### P0: Foundations (1–2 weeks)
 
 - [x] Set up the pnpm workspace with the layout above. TypeScript strict mode, ESLint and Prettier, Vitest.
-- [ ] GitHub Actions: lint, type-check, tests, dependency audit, license check on every PR. *(All but the license check are in `ci.yml`.)*
+- [x] GitHub Actions: lint, type-check, tests, dependency audit, license check on every PR.
 - [ ] Renovate or Dependabot configured for npm, GitHub Actions and Docker base-image digests (DEP-37). *(npm and Actions done; add Docker when the Dockerfile lands.)*
 - [x] `packages/core/crypto`: Argon2id (WASM), HKDF, AES-GCM wrap and unwrap, payload encrypt and decrypt with AAD. **Test vectors** committed. *(Library choice and format details: [ADR-0008](docs/adr/0008-crypto-implementation.md).)*
 - [x] `packages/core/hlc`: HLC with tests (monotonic, clock skew, comparison including device ID).
 - [x] `packages/core/schema`: record envelope plus a payload schema per collection (zod), with schema versions. *(`bookmarks` follows in P4 and `devices` after Q2.)*
 - [ ] Settle Q1 (server framework and SQLite driver) and record it in ADR-0004.
-- [ ] Write `CONTRIBUTING.md` and a short README "How it works" section linking the SRS.
+- [x] Write `CONTRIBUTING.md` and a short README "How it works" section linking the SRS.
 
 **Exit:** CI green. Crypto round-trips and test vectors pass in Node **and** in a browser (Vitest browser mode or Playwright).
 
@@ -209,6 +210,7 @@ Pitfalls for one app or package live in that folder's `CLAUDE.md`. The sections 
 
 ### Tooling
 - **typescript-eslint supports TypeScript only below 6.1.** TypeScript 7 (the native port) is out, but stay on `typescript ~6.0` until typescript-eslint supports it.
+- Scripts that call pnpm from Node must use `process.env.npm_execpath`. It can be a JS file (run it with `node`) or a native binary (run it directly); spawning `pnpm` by name fails on Windows, where it's `pnpm.cmd`.
 - Node 25+ no longer bundles corepack, so `packageManager` in `package.json` isn't enforced automatically. CI uses `pnpm/action-setup`, which reads it.
 - Vitest 5: `passWithNoTests` is a root-only option; per-project configs (`defineProject`) reject it.
 - Workspace packages export their TypeScript source (`"exports": "./src/index.ts"`). Bundlers and Vitest handle this directly, and the base tsconfig uses `erasableSyntaxOnly`, so Node 26 can run the source with built-in type stripping. Revisit if a package is ever published to npm.
