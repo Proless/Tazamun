@@ -11,7 +11,7 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 ## Current status
 
 - **Phase:** P1 (engine, server, accounts, tabs). P0's exit criteria are met: workspace, tooling and CI are set up, and `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Q1 is decided: Hono and `node:sqlite`.
-- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `deploy/` (Dockerfile, Compose files, proxy examples; see [deploy/README.md](deploy/README.md)), `scripts/`, `docs/`, `.github/`. The image pipeline builds, smoke-tests and scans every PR and publishes `edge` from `main`. Next: the extension scaffold.
+- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `deploy/` (Dockerfile, Compose files, proxy examples; see [deploy/README.md](deploy/README.md)), `scripts/`, `docs/`, `.github/`. The image pipeline builds, smoke-tests and scans every PR and publishes `edge` from `main`. `apps/extension` is scaffolded (WXT, three targets, manifest, placeholder pages; see [apps/extension/README.md](apps/extension/README.md)). Next: onboarding and the sync engine.
 - The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
@@ -47,7 +47,7 @@ Folders marked *(planned)* don't exist yet.
 
 ```text
 apps/
-  extension/         (planned, P1) WXT; engine in src/engine/, modules in src/modules/<type>/
+  extension/         WXT + Vue 3, Chrome/Edge/Firefox; engine in src/engine/, modules in src/modules/<type>/ (planned)
   server/            Node.js LTS + Hono + node:sqlite: HTTP API, config, migrations; serves the dashboard build from P3
   dashboard/         (planned, P3) Vue 3 + Vite SPA
 packages/
@@ -65,7 +65,8 @@ docs/
   guides/            self-hosting.md, server-configuration.md (generated); user and contributor docs follow
 scripts/             repository maintenance scripts (license check)
 .github/
-  workflows/ci.yml   lint, type-check, Node tests, browser tests, dependency audit, license check
+  workflows/ci.yml   lint, type-check, Node tests, browser tests, extension builds + web-ext lint,
+                     dependency audit, license check
   workflows/image.yml  image build for amd64 and arm64, smoke test, scan; publishes edge from main
                      (release.yml follows in P6)
   dependabot.yml     npm, GitHub Actions, Docker base image
@@ -99,7 +100,8 @@ Commands (Node 26, pnpm 12; install pnpm with `npm install -g pnpm`, since Node 
 | `docker build -f deploy/docker/Dockerfile -t tazamun:test .` | Build the server image locally, for testing ([deploy/README.md](deploy/README.md)) |
 | `pnpm --filter @tazamun/server smoke tazamun:test` | Container smoke test against a local image (DEP-29) |
 
-Still to come: `pnpm --filter extension dev`.
+| `pnpm --filter @tazamun/extension dev` | Run the extension in Chrome with live reload (`dev:firefox` for Firefox) |
+| `pnpm --filter @tazamun/extension build` | Production builds for Chrome, Edge and Firefox in `apps/extension/.output/` |
 
 ---
 
@@ -128,7 +130,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 - [x] **Container image:** multi-stage Dockerfile, non-root UID 10001, read-only root filesystem, `/data` volume, `HEALTHCHECK`, correct signal handling, JSON logs, OCI labels, instance secret generated on first start (DEP-1…11).
 - [x] **Compose files:** `docker-compose.yml` and `docker-compose.caddy.yml` with `.env.example` and resource limits. Reverse-proxy docs for Caddy, Traefik and nginx. Warning about local storage and a single instance (DEP-17…19, DEP-22).
 - [x] **CI image pipeline:** build on every PR plus a container smoke test (health, API suite, SIGTERM, restart persistence); vulnerability scan; multi-arch with Buildx; publish `edge` and `sha-*` to GHCR from `main` with minimal token permissions (DEP-28…30, DEP-33, DEP-34, DEP-38).
-- [ ] **Extension scaffold:** WXT with three targets. Fixed Firefox add-on ID. CSP with `'wasm-unsafe-eval'`. Permissions as in SRS 2.7.
+- [x] **Extension scaffold:** WXT with three targets. Fixed Firefox add-on ID. CSP with `'wasm-unsafe-eval'`. Permissions as in SRS 2.7.
 - [ ] **Onboarding:** create or connect an account, recovery kit, device registration (ACC-1…8, ACC-11, UI-2).
 - [ ] **Engine:** outbox in IndexedDB, debounced push, alarm and popup-triggered pull, backoff, status, pause, per-module toggles (ENG-1…14).
 - [ ] **Module interface** plus an in-memory fake browser for tests.
@@ -230,24 +232,8 @@ Pitfalls for one app or package live in that folder's `CLAUDE.md`. The sections 
 - `erasableSyntaxOnly` (base tsconfig) forbids constructor parameter properties (`constructor(readonly x: T)`) and enums, because Node's type stripping can't run them. Declare fields explicitly.
 - Workspace packages export their TypeScript source (`"exports": "./src/index.ts"`). Bundlers and Vitest handle this directly, and the base tsconfig uses `erasableSyntaxOnly`, so Node 26 can run the source with built-in type stripping. Revisit if a package is ever published to npm.
 
-### MV3 and extension lifecycle
-- The Chrome service worker is **killed after about 30 s idle**; Firefox uses an event page. Any state in a module-level variable can vanish. Persist to IndexedDB or `storage`, and design every step to be resumable and idempotent.
-- `setTimeout`/`setInterval` don't survive suspension. Use `chrome.alarms` (Chrome minimum 30 s; Tazamun's default is 60 s).
-- Register event listeners **synchronously at top level** of the background script, or events that wake the worker will be missed.
-- No WebSockets or SSE that need to stay open. Polling `/v1/info` is the design ([ADR-0003](docs/adr/0003-sync-protocol-records-hlc.md)).
-- `storage.local` is 10 MB without `unlimitedStorage`. Put history and snapshots in IndexedDB.
-- WASM (Argon2id) needs `'wasm-unsafe-eval'` in the extension CSP. Add it from day one.
-- Call `z.config({ jitless: true })` at startup in every extension page, the service worker and the dashboard, before any zod parse. The CSP forbids `eval`, which zod uses by default ([packages/core/CLAUDE.md](packages/core/CLAUDE.md#schemas)).
-- Argon2id with 64 MiB is slow on purpose (about 0.5–1 s). Never run it on every sync, only at sign-in and unlock.
-
-### Cross-browser differences
-- `browser.*` (promise-based) vs `chrome.*`: use WXT's `browser` everywhere.
-- Different bookmark root IDs; roots are read-only; Chromium has no separators; Edge calls bookmarks "Favorites". See BMK-3.
-- Firefox refuses `tabs.create` for privileged URLs (`about:config` and others) and restricts `file:`. Fall back to copying the URL (TAB-8).
-- Firefox's `management.getAll()` returns add-on IDs, not store slugs.
-- Chrome's `history.addUrl` can't set title or time. That's one reason history isn't written back ([ADR-0005](docs/adr/0005-history-stored-in-extension.md)).
-- `contextMenus` (Chromium) vs `menus` (Firefox); tab group APIs differ.
-- Test **every** change on Firefox too. The Chromium end-to-end setup is easier to automate, so Firefox regressions slip through.
+### Extension (MV3, cross-browser, stores)
+- MV3 lifecycle, cross-browser differences and store publishing pitfalls are in [apps/extension/CLAUDE.md](apps/extension/CLAUDE.md).
 
 ### Sync and merge
 - **Echo loops:** applying a remote change fires a local event, which looks like a new change, which gets pushed… Always suppress echoes and verify the post-apply diff is empty.
@@ -299,11 +285,6 @@ Pitfalls for one app or package live in that folder's `CLAUDE.md`. The sections 
 - **The smoke test** (`apps/server/test/smoke.ts`) runs on the runner, talks to the container over a random loopback port, and uses `@tazamun/core` like a real client (Argon2id included). Run it locally with `pnpm --filter @tazamun/server smoke <image>`.
 - **Token scope:** don't give the workflow `write-all`. Use `packages: write` and `id-token: write` only where needed, and keep the Docker Hub token out of PR workflows from forks.
 - **Reverse proxies:** nginx's default `client_max_body_size` (1 MB) is below the API's 2 MB batch limit, and missing `X-Forwarded-Proto` breaks the public-URL check. Both belong in the proxy examples.
-
-### Store publishing
-- AMO requires source code and build instructions for bundled code. Keep builds reproducible from the start.
-- Store reviewers will question `history`, `tabs`, `management` and `bookmarks`. Keep the justifications ready, and request host permission only for the user's server URL.
-- Extension updates reach users over days. The server must stay compatible with at least the previous client version (`minClientVersion`).
 
 ## How to work in this repository (for Claude)
 

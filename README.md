@@ -21,7 +21,7 @@ Details: [architecture](<docs/srs/2. Overall Description.md#22-architecture>), [
 | ------ | ---------- |
 | [packages/core](packages/core/README.md) | Shared library: Hybrid Logical Clock, record schemas, encryption. Merge functions and the API client follow in P1. |
 | `packages/ui` | Shared Vue components (planned) |
-| `apps/extension` | Browser extension for Chrome, Edge and Firefox (planned, P1) |
+| [apps/extension](apps/extension/README.md) | Browser extension for Chrome, Edge and Firefox, built with WXT and Vue (scaffold; onboarding and sync are next) |
 | [apps/server](apps/server/README.md) | Sync server: HTTP API, accounts, encrypted record storage. Built on Hono and `node:sqlite`. Serves the dashboard from P3. |
 | `apps/dashboard` | Web dashboard (planned, P3) |
 | [deploy](deploy/README.md) | Docker image, Compose files, reverse-proxy examples. To run a server: [self-hosting guide](docs/guides/self-hosting.md). |
