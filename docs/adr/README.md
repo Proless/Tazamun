@@ -11,6 +11,7 @@ Each ADR records one decision that is hard to reverse: the context, the decision
 | [0005](0005-history-stored-in-extension.md) | Synced history lives in Tazamun, not in native browser history | Accepted |
 | [0006](0006-bookmark-safety.md) | Bookmark safety: diff against a mirror, snapshots, mass-deletion guard | Accepted |
 | [0007](0007-container-distribution.md) | One container image, built and published only by CI | Accepted |
+| [0008](0008-crypto-implementation.md) | Crypto implementation: Web Crypto plus hash-wasm, and the details SEC-1…3 leave open | Accepted |
 
 Template for new ADRs:
 

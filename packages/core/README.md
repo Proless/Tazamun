@@ -6,7 +6,7 @@ The shared library of Tazamun: everything that the extension, the dashboard and 
 | ------ | ------ | ------------ |
 | `hlc` | Done | Hybrid Logical Clock: orders edits across devices (ENG-7, [ADR-0003](../../docs/adr/0003-sync-protocol-records-hlc.md)) |
 | `schema` | Done for `tabs`, `commands`, `history`, `extensions` | Wire format of the HTTP API, and decrypted payload schemas per collection (zod) ([SRS 4.4](<../../docs/srs/4. External Interface Requirements.md#44-communications-interfaces>)). `bookmarks` follows in P4, `devices` after Q2. |
-| `crypto` | P0 | Argon2id, HKDF, AES-GCM key wrapping and payload encryption ([SRS 5.2](<../../docs/srs/5. Other Nonfunctional Requirements.md#52-security-requirements>)) |
+| `crypto` | Done | Argon2id key derivation, account-key wrapping, HKDF collection keys, AES-GCM payload encryption with AAD, keyed history IDs ([SRS 5.2](<../../docs/srs/5. Other Nonfunctional Requirements.md#52-security-requirements>), [ADR-0008](../../docs/adr/0008-crypto-implementation.md)) |
 | merge functions | P1+ | One pure merge function per data type |
 | API client | P1 | Typed client for the HTTP API |
 
@@ -35,6 +35,32 @@ try {
 // Last writer wins: the larger stamp wins.
 const winner = hlc.compare(a, b) >= 0 ? a : b;
 ```
+
+Crypto, from account creation to one record:
+
+```ts
+import { crypto } from '@tazamun/core';
+
+// Account creation (ACC-1…3). Sign-in repeats deriveMasterKeys with the salt and params from prelogin.
+const accountId = crypto.randomId();
+const salt = crypto.randomBytes(crypto.SALT_BYTES);
+const { authKey, kek } = await crypto.deriveMasterKeys(passphrase, salt, crypto.DEFAULT_KDF_PARAMS);
+const accountKey = crypto.generateAccountKey();
+const wrappedAccountKey = await crypto.wrapAccountKey(kek, accountKey, accountId);
+// Send accountId, salt, params, wrappedAccountKey and hashAuthKey(authKey) to the server.
+
+// Per record (SEC-3): the AAD binds the ciphertext to its account, collection and record.
+const keys = await crypto.deriveAccountKeys(accountKey);
+const key = await keys.collectionKey('tabs');
+const address = { accountId, collection: 'tabs', recordId: deviceId };
+const payload = await crypto.encryptPayload(key, address, schemaPayload);
+const decrypted = await crypto.decryptPayload(key, address, payload); // DecryptError if moved or tampered
+
+// History record IDs (HIS-1).
+const id = await crypto.keyedId(await keys.historyIdKey(), normalizedUrl);
+```
+
+`deriveMasterKeys` takes about 0.5–1 s on purpose. Call it at sign-in and unlock only.
 
 Schemas validate what comes off the wire and out of decryption:
 
@@ -69,7 +95,8 @@ Run from the repository root:
 | Command | What it does |
 | ------- | ------------ |
 | `pnpm --filter @tazamun/core typecheck` | Type-check this package |
-| `pnpm test --project core` | Run this package's tests |
+| `pnpm test --project core` | Run this package's tests in Node |
+| `pnpm test:browser` | Run them in Chromium and Firefox (first: `pnpm --filter @tazamun/core exec playwright install chromium firefox`) |
 | `pnpm test:watch --project core` | Tests in watch mode |
 
 ## Layout
@@ -77,13 +104,20 @@ Run from the repository root:
 ```text
 src/
   index.ts        public API: re-exports each module as a namespace
+  crypto/
+    encoding.ts   base64url, UTF-8, random bytes
+    kdf.ts        Argon2id (hash-wasm), KDF parameter limits, authKey/KEK split
+    aead.ts       AES-256-GCM in the nonce || ciphertext || tag format
+    keys.ts       account key, wrapping, HKDF collection and history-ID keys
+    record.ts     payload encryption with AAD accountId|collection|recordId
+    ids.ts        keyed record IDs (HMAC, 128 bits)
   hlc/            hlc.ts, hlc.test.ts, index.ts
   schema/
     primitives.ts record ID, device ID, HLC stamp, timestamps, base64url
     envelope.ts   HTTP API wire format (records, pull, push, errors, limits)
     payload.ts    decrypted payload {v, deleted, hlc, data}, decodePayload, versioning
     collections/  one file per collection: tabs, commands, history, extensions
-test/             shared fixtures and test vectors (crypto vectors go here)
+test/vectors/     published crypto vectors (each file names its source) and Tazamun format vectors
 ```
 
 Unit tests live next to the code as `*.test.ts`. Property-based tests use [fast-check](https://fast-check.dev).

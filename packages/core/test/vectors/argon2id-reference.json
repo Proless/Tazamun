@@ -1,0 +1,71 @@
+{
+  "source": "Argon2 reference implementation (P-H-C/phc-winner-argon2), src/test.c, Argon2id version 0x13. memoryKiB is 2^m from the m column.",
+  "url": "https://github.com/P-H-C/phc-winner-argon2/blob/master/src/test.c",
+  "hashLength": 32,
+  "tests": [
+    {
+      "iterations": 2,
+      "memoryKiB": 65536,
+      "parallelism": 1,
+      "password": "password",
+      "salt": "somesalt",
+      "hash": "09316115d5cf24ed5a15a31a3ba326e5cf32edc24702987c02b6566f61913cf7"
+    },
+    {
+      "iterations": 2,
+      "memoryKiB": 262144,
+      "parallelism": 1,
+      "password": "password",
+      "salt": "somesalt",
+      "hash": "78fe1ec91fb3aa5657d72e710854e4c3d9b9198c742f9616c2f085bed95b2e8c"
+    },
+    {
+      "iterations": 2,
+      "memoryKiB": 256,
+      "parallelism": 1,
+      "password": "password",
+      "salt": "somesalt",
+      "hash": "9dfeb910e80bad0311fee20f9c0e2b12c17987b4cac90c2ef54d5b3021c68bfe"
+    },
+    {
+      "iterations": 2,
+      "memoryKiB": 256,
+      "parallelism": 2,
+      "password": "password",
+      "salt": "somesalt",
+      "hash": "6d093c501fd5999645e0ea3bf620d7b8be7fd2db59c20d9fff9539da2bf57037"
+    },
+    {
+      "iterations": 1,
+      "memoryKiB": 65536,
+      "parallelism": 1,
+      "password": "password",
+      "salt": "somesalt",
+      "hash": "f6a5adc1ba723dddef9b5ac1d464e180fcd9dffc9d1cbf76cca2fed795d9ca98"
+    },
+    {
+      "iterations": 4,
+      "memoryKiB": 65536,
+      "parallelism": 1,
+      "password": "password",
+      "salt": "somesalt",
+      "hash": "9025d48e68ef7395cca9079da4c4ec3affb3c8911fe4f86d1a2520856f63172c"
+    },
+    {
+      "iterations": 2,
+      "memoryKiB": 65536,
+      "parallelism": 1,
+      "password": "differentpassword",
+      "salt": "somesalt",
+      "hash": "0b84d652cf6b0c4beaef0dfe278ba6a80df6696281d7e0d2891b817d8c458fde"
+    },
+    {
+      "iterations": 2,
+      "memoryKiB": 65536,
+      "parallelism": 1,
+      "password": "password",
+      "salt": "diffsalt",
+      "hash": "bdf32b05ccc42eb15d58fd19b1f856b113da1e9a5874fdcc544308565aa8141c"
+    }
+  ]
+}

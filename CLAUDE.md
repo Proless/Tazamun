@@ -10,7 +10,7 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 
 ## Current status
 
-- **Phase:** P0 (foundations). Workspace, tooling and CI are set up. `packages/core` has the HLC and the record schemas; crypto is next.
+- **Phase:** P0 (foundations). Workspace, tooling and CI are set up. `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Left in P0: license check in CI, Q1, `CONTRIBUTING.md`.
 - The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
@@ -78,7 +78,8 @@ Commands (Node 26, pnpm 12; install pnpm with `npm install -g pnpm`, since Node 
 | Command | What it does |
 | ------- | ------------ |
 | `pnpm install` | Install all workspace dependencies |
-| `pnpm test` | Run every package's Vitest project |
+| `pnpm test` | Run every package's Vitest project in Node |
+| `pnpm test:browser` | Run the browser projects in Chromium and Firefox (first run `pnpm --filter @tazamun/core exec playwright install chromium firefox`) |
 | `pnpm lint` | ESLint (type-aware) over the whole repo |
 | `pnpm typecheck` | `tsc --noEmit` in every package |
 | `pnpm format` / `pnpm format:check` | Prettier write / check |
@@ -96,7 +97,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 - [x] Set up the pnpm workspace with the layout above. TypeScript strict mode, ESLint and Prettier, Vitest.
 - [ ] GitHub Actions: lint, type-check, tests, dependency audit, license check on every PR. *(All but the license check are in `ci.yml`.)*
 - [ ] Renovate or Dependabot configured for npm, GitHub Actions and Docker base-image digests (DEP-37). *(npm and Actions done; add Docker when the Dockerfile lands.)*
-- [ ] `packages/core/crypto`: Argon2id (WASM), HKDF, AES-GCM wrap and unwrap, payload encrypt and decrypt with AAD. **Test vectors** committed.
+- [x] `packages/core/crypto`: Argon2id (WASM), HKDF, AES-GCM wrap and unwrap, payload encrypt and decrypt with AAD. **Test vectors** committed. *(Library choice and format details: [ADR-0008](docs/adr/0008-crypto-implementation.md).)*
 - [x] `packages/core/hlc`: HLC with tests (monotonic, clock skew, comparison including device ID).
 - [x] `packages/core/schema`: record envelope plus a payload schema per collection (zod), with schema versions. *(`bookmarks` follows in P4 and `devices` after Q2.)*
 - [ ] Settle Q1 (server framework and SQLite driver) and record it in ADR-0004.
