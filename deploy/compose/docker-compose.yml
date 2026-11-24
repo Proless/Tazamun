@@ -1,0 +1,54 @@
+# Tazamun behind a reverse proxy you already run (DEP-18).
+# For automatic HTTPS without one, use docker-compose.caddy.yml instead.
+#
+#   cp .env.example .env     # then set TAZAMUN_DOMAIN
+#   docker compose up -d
+#   docker compose exec tazamun tazamun invite create
+#
+# Your proxy forwards https://<TAZAMUN_DOMAIN> to 127.0.0.1:8080, sets X-Forwarded-For and
+# X-Forwarded-Proto, and allows request bodies of at least 2 MB. Examples: deploy/proxy/.
+# Guide: docs/guides/self-hosting.md
+
+name: tazamun
+
+services:
+  tazamun:
+    image: ${TAZAMUN_IMAGE:-ghcr.io/proless/tazamun:edge}
+    restart: unless-stopped
+    environment:
+      TAZAMUN_PUBLIC_URL: https://${TAZAMUN_DOMAIN:?Set TAZAMUN_DOMAIN in .env}
+      TAZAMUN_REGISTRATION: ${TAZAMUN_REGISTRATION:-invite}
+      TAZAMUN_STORAGE_QUOTA_MB: ${TAZAMUN_STORAGE_QUOTA_MB:-200}
+      TAZAMUN_LOG_LEVEL: ${TAZAMUN_LOG_LEVEL:-info}
+      # Only the proxy can reach the port (it's bound to 127.0.0.1), so its headers are trusted.
+      TAZAMUN_TRUST_PROXY: 'true'
+    ports:
+      # Loopback only: the proxy on this host connects here. Don't publish it on all interfaces.
+      - 127.0.0.1:${TAZAMUN_HOST_PORT:-8080}:8080
+    volumes:
+      # Local storage only, and only one Tazamun container per volume (DEP-22).
+      - tazamun-data:/data
+    # DEP-3: read-only root filesystem; all state is in /data.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # DEP-7: in-flight requests get 10 s; leave time to checkpoint the database after that.
+    stop_grace_period: 20s
+    # DEP-17: enough for dozens of accounts (PERF-7).
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+volumes:
+  tazamun-data:

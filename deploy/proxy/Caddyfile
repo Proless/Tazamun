@@ -1,0 +1,15 @@
+# Caddy in front of Tazamun from deploy/compose/docker-compose.yml (DEP-19).
+# Caddy gets the TLS certificate itself and sets X-Forwarded-For and X-Forwarded-Proto.
+
+sync.example.org {
+	encode zstd gzip
+
+	# The API accepts bodies up to 2 MiB (SRS 4.4.1); leave headroom.
+	request_body {
+		max_size 4MB
+	}
+
+	header Strict-Transport-Security "max-age=31536000"
+
+	reverse_proxy 127.0.0.1:8080
+}

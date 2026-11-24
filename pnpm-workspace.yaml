@@ -13,3 +13,7 @@ minimumReleaseAgeExclude:
   - '@typescript-eslint/utils@8.74.0'
   - '@typescript-eslint/visitor-keys@8.74.0'
   - typescript-eslint@8.74.0
+# Dependency install scripts that may run (true) or are known to be unnecessary (false).
+allowBuilds:
+  # Its postinstall only checks the platform binary, which comes as an optional dependency.
+  esbuild: false

@@ -1,0 +1,15 @@
+# Build context allow-list for deploy/docker/Dockerfile. BuildKit reads <Dockerfile>.dockerignore
+# next to the Dockerfile. Only what the build needs goes in: no .git, no .env, no data.
+*
+!LICENSE
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.base.json
+!packages/core/package.json
+!packages/core/src/**
+!apps/server/package.json
+!apps/server/build.ts
+!apps/server/src/**
+**/*.test.ts
+**/node_modules
