@@ -15,7 +15,7 @@ Tazamun has no official hosted service, so every user depends on someone self-ho
 - **CI is the only publisher.** Pull requests build and smoke-test the image. `main` publishes `edge`. SemVer tags publish `X.Y.Z`, `X.Y`, `X` and `latest`. Releases are scanned, signed with keyless cosign, and carry an SBOM and provenance attestations. Base images are pinned by digest and updated by bot PRs.
 - GHCR is the primary registry. Docker Hub is a mirror for releases.
 
-Requirements: SRS [section 3.11](<../3. Software Features.md#311-self-hosting-containers-and-image-publishing>) (DEP-1…39).
+Requirements: SRS [section 3.11](<../srs/3. Software Features.md#311-self-hosting-containers-and-image-publishing>) (DEP-1…39).
 
 ## Consequences
 

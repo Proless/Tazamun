@@ -11,16 +11,22 @@ Revision 1 required .NET for the backend, Node.js and Vue for the frontend, and 
 
 TypeScript everywhere, in a single pnpm-workspace monorepo:
 
-```
-packages/core        schemas, crypto, HLC, merge functions, API client (runs in Node + browsers)
-packages/ui          shared Vue 3 components (popup, options, dashboard)
-apps/extension       WXT project → Chrome, Edge, Firefox builds
-apps/server          Node.js LTS HTTP API + SQLite + serves the dashboard
-apps/dashboard       Vue 3 SPA (Vite)
+```text
+apps/                deployable programs, each with its own src/
+  extension/         WXT project → Chrome, Edge, Firefox builds
+  server/            Node.js LTS HTTP API + SQLite + serves the dashboard
+  dashboard/         Vue 3 SPA (Vite)
+packages/            libraries shared by the apps, each with its own src/
+  core/              schemas, crypto, HLC, merge functions, API client (runs in Node + browsers)
+  ui/                shared Vue 3 components (popup, options, dashboard)
 data/                extension-equivalents.json and other community data
 deploy/              Dockerfile, Compose files, reverse-proxy and Kubernetes examples (ADR-0007)
+docs/                srs/ (requirements), adr/ (decisions), guides/ (user and operator docs)
+scripts/             repository maintenance scripts
 .github/workflows/   CI, container build/publish, release
 ```
+
+Every app and package follows the same shape: `src/` for code, unit tests next to the code as `*.test.ts`, shared fixtures and test vectors in `test/`, and its own `package.json`, `tsconfig.json` and `vitest.config.ts`. A single top-level `src/` was considered and rejected: the extension, server and dashboard are built, versioned and shipped separately, and `packages/core` must stay free of browser and server dependencies, which separate packages enforce.
 
 - Server: Node.js LTS, Hono or Fastify, SQLite (`better-sqlite3`, or `node:sqlite` once stable). One container with a `/data` volume.
 - Vue 3 stays from revision 1, now for the extension UIs as well as the dashboard.
@@ -31,4 +37,4 @@ deploy/              Dockerfile, Compose files, reverse-proxy and Kubernetes exa
 - Contributors need to know one language and one toolchain.
 - Schemas and merge code are written once and shared by the extension, dashboard and tests.
 - Self-hosting is one container with no database server.
-- If someone strongly wants a .NET (or Go, or Rust) server later, it's feasible: the server only implements the HTTP API in SRS [section 4.4](<../4. External Interface Requirements.md#44-communications-interfaces>), which has no data-type logic. It would be a second implementation, not a replacement.
+- If someone strongly wants a .NET (or Go, or Rust) server later, it's feasible: the server only implements the HTTP API in SRS [section 4.4](<../srs/4. External Interface Requirements.md#44-communications-interfaces>), which has no data-type logic. It would be a second implementation, not a replacement.

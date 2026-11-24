@@ -1,0 +1,14 @@
+# DEP-37: keep npm packages, GitHub Actions and (later) Docker base images up to date.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dev-tooling:
+        dependency-type: development
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
