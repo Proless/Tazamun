@@ -1,6 +1,6 @@
 # CLAUDE.md: Tazamun
 
-Guidance for Claude (and human contributors) working in this repository: what the project is, where it stands, the roadmap by phase, and the pitfalls already known.
+Guidance for Claude working in this repository: what the project is, where it stands, the roadmap by phase, and the pitfalls already known. Human contributors start with [CONTRIBUTING.md](CONTRIBUTING.md), which repeats the rules below; keep the two in sync.
 
 ## What Tazamun is
 
@@ -10,7 +10,8 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 
 ## Current status
 
-- **Phase:** P1 (engine, server, accounts, tabs). P0 is complete: workspace, tooling and CI are set up, and `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Q1 is decided: Hono and `node:sqlite`.
+- **Phase:** P1 (engine, server, accounts, tabs). P0's exit criteria are met: workspace, tooling and CI are set up, and `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Q1 is decided: Hono and `node:sqlite`. The one open P0 item, Dependabot for Docker base images, lands with the Dockerfile in P1.
+- **What exists:** `packages/core`, `scripts/`, `docs/`, `.github/`. No app exists yet; `apps/server` is the next folder to create.
 - The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
@@ -22,7 +23,9 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 | Design decisions and why | [`docs/adr/`](docs/adr/README.md) |
 | HTTP API and record envelope | [SRS section 4.4](<docs/srs/4. External Interface Requirements.md#44-communications-interfaces>) |
 | Self-hosting, container image, publishing pipeline | [SRS section 3.11](<docs/srs/3. Software Features.md#311-self-hosting-containers-and-image-publishing>), [ADR-0007](docs/adr/0007-container-distribution.md) |
-| Crypto parameters and threat model | [SRS section 5.2](<docs/srs/5. Other Nonfunctional Requirements.md#52-security-requirements>) |
+| Crypto parameters and threat model | [SRS section 5.2](<docs/srs/5. Other Nonfunctional Requirements.md#52-security-requirements>), [ADR-0008](docs/adr/0008-crypto-implementation.md) (library and format v1 details) |
+| How to use an app or package, and its own pitfalls | that folder's `README.md` and `CLAUDE.md` |
+| Contributor process (setup, commits, PR checklist) | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Roadmap, gaps, pitfalls | this file |
 
 If the code and the SRS disagree, fix one of them in the same pull request. Don't leave them out of sync.
@@ -38,28 +41,33 @@ If the code and the SRS disagree, fix one of them in the same pull request. Don'
 7. **Never capture private or incognito browsing.**
 8. Every hard-to-reverse decision gets an ADR. Reference requirement IDs in commits and PRs (e.g. `feat(tabs): send tab to device (TAB-7)`).
 
-## Planned repository layout ([ADR-0004](docs/adr/0004-typescript-monorepo-stack.md))
+## Repository layout ([ADR-0004](docs/adr/0004-typescript-monorepo-stack.md))
+
+Folders marked *(planned)* don't exist yet.
 
 ```text
 apps/
-  extension/         WXT; engine in src/engine/, modules in src/modules/<type>/
-  server/            Node.js LTS + Hono + node:sqlite; serves the dashboard build
-  dashboard/         Vue 3 + Vite SPA
+  extension/         (planned, P1) WXT; engine in src/engine/, modules in src/modules/<type>/
+  server/            (planned, P1) Node.js LTS + Hono + node:sqlite; serves the dashboard build
+  dashboard/         (planned, P3) Vue 3 + Vite SPA
 packages/
-  core/              schemas (zod), crypto, HLC, merge functions, API client; no browser APIs
-  ui/                shared Vue 3 components
-data/                extension-equivalents.json
-deploy/
+  core/              HLC, schemas (zod), crypto; merge functions and API client from P1; no browser APIs
+  ui/                (planned) shared Vue 3 components
+data/                (planned, P5) extension-equivalents.json
+deploy/              (planned, P1)
   docker/            Dockerfile (multi-stage), .dockerignore
   compose/           docker-compose.yml, docker-compose.caddy.yml, .env.example
   proxy/             Caddy / Traefik / nginx examples
   k8s/               example manifests (one replica + PVC)
 docs/
   srs/               requirements (sections 1–6)
-  adr/               architecture decision records
-  guides/            user, self-hosting and contributor docs (from P1)
-scripts/             repository maintenance scripts
-.github/workflows/   ci.yml (lint, test, image build + smoke test), publish-edge.yml, release.yml
+  adr/               architecture decision records (0001–0008)
+  guides/            (planned, P1) user, self-hosting and contributor docs
+scripts/             repository maintenance scripts (license check)
+.github/
+  workflows/ci.yml   lint, type-check, Node tests, browser tests, dependency audit, license check
+                     (P1 adds image build + smoke test; publish-edge.yml in P1, release.yml in P6)
+  dependabot.yml     npm and GitHub Actions; Docker base images from P1
 ```
 
 Each app and package has the same shape: `src/` for code, unit tests next to it as `*.test.ts`, shared fixtures and test vectors in `test/`, plus its own `package.json`, `tsconfig.json` and `vitest.config.ts`. Root config (`tsconfig.base.json`, `eslint.config.js`, `vitest.config.ts`, `.prettierrc.json`) applies to all of them. Create a folder only when it gets real content.
@@ -81,7 +89,7 @@ Commands (Node 26, pnpm 12; install pnpm with `npm install -g pnpm`, since Node 
 | `pnpm test` | Run every package's Vitest project in Node |
 | `pnpm test:browser` | Run the browser projects in Chromium and Firefox (first run `pnpm --filter @tazamun/core exec playwright install chromium firefox`) |
 | `pnpm lint` | ESLint (type-aware) over the whole repo |
-| `pnpm typecheck` | `tsc --noEmit` in every package |
+| `pnpm typecheck` | `tsc --noEmit` in every package and in `scripts/` |
 | `pnpm format` / `pnpm format:check` | Prettier write / check |
 | `pnpm licenses:check` | Dependency license policy ([scripts/README.md](scripts/README.md)) |
 
@@ -222,6 +230,7 @@ Pitfalls for one app or package live in that folder's `CLAUDE.md`. The sections 
 - No WebSockets or SSE that need to stay open. Polling `/v1/info` is the design ([ADR-0003](docs/adr/0003-sync-protocol-records-hlc.md)).
 - `storage.local` is 10 MB without `unlimitedStorage`. Put history and snapshots in IndexedDB.
 - WASM (Argon2id) needs `'wasm-unsafe-eval'` in the extension CSP. Add it from day one.
+- Call `z.config({ jitless: true })` at startup in every extension page, the service worker and the dashboard, before any zod parse. The CSP forbids `eval`, which zod uses by default ([packages/core/CLAUDE.md](packages/core/CLAUDE.md#schemas)).
 - Argon2id with 64 MiB is slow on purpose (about 0.5–1 s). Never run it on every sync, only at sign-in and unlock.
 
 ### Cross-browser differences
@@ -263,10 +272,11 @@ Pitfalls for one app or package live in that folder's `CLAUDE.md`. The sections 
 - SQLite: enable WAL mode, use one writer connection, and make every batch insert a transaction. Back up online with `VACUUM INTO` or the backup API, never by copying the file while it's in use.
 - Assign `seq` inside the write transaction so it never has gaps or duplicates.
 - Never log request bodies. History record IDs in logs reveal browsing patterns over time.
+- **`node:sqlite` is a release candidate in Node 26.** Keep all SQLite calls in one database module in `apps/server`, so an API change (or a switch to `better-sqlite3`) touches one place ([ADR-0004](docs/adr/0004-typescript-monorepo-stack.md)).
+- Hono has no logger. Write one small structured JSON logger for the server, with no way to log bodies, tokens or record IDs from the history collection (ADM-7).
 
 ### Containers, self-hosting and publishing
-- **Native modules:** the server uses the built-in `node:sqlite` (Q1), so the image needs no native builds. Keep it that way. A native dependency must be built in the same base image family (glibc vs musl) and architecture as the runtime stage, or its binaries won't load, and arm64 builds under QEMU are slow.
-- **`node:sqlite` is a release candidate in Node 26.** Keep all SQLite calls in one database module in `apps/server`, so an API change (or a switch to `better-sqlite3`) touches one place.
+- **Native modules:** the server uses the built-in `node:sqlite` (Q1), so the image needs no native builds. Keep it that way. A native dependency must be built in the same base image family (glibc vs musl) and architecture as the runtime stage, or its binaries won't load.
 - **arm64 under QEMU** is very slow, and native compiles can time out. Prefer native arm64 runners, and cache dependency layers.
 - **PID 1 and signals:** `CMD ["npm", "start"]` doesn't forward `SIGTERM` properly. Run `node` directly (or use a minimal init), or `docker stop` will kill the server without checkpointing the WAL.
 - **Non-root plus bind mounts:** a host directory owned by root won't be writable by UID 10001. Document `chown 10001:10001`, prefer named volumes, and make the server fail with a clear message when `/data` isn't writable.
@@ -288,6 +298,7 @@ Pitfalls for one app or package live in that folder's `CLAUDE.md`. The sections 
 - Before implementing a feature, read its SRS section and the ADRs it references. Requirements tell you **what**; ADRs tell you **why**.
 - Keep the phase checklists above up to date: tick a step when it's merged, and update **Current status** when a phase's exit criteria are met.
 - Put new pitfalls where they belong as you find them: in the folder's own `CLAUDE.md` if they concern one app or package, otherwise in the matching section above.
-- When you add or change an app or package, update its `README.md` and `CLAUDE.md` in the same PR.
+- When you add or change an app or package, update its `README.md` and `CLAUDE.md` in the same PR. When you create a new app or package, give it both files from the start, add it to the table in the root `README.md` and to the layout above, and move its pitfall section from this file into its own `CLAUDE.md`.
+- If you change a rule, a command or the PR process, update [CONTRIBUTING.md](CONTRIBUTING.md) too.
 - When a requirement turns out to be wrong or impossible, update the SRS in the same PR and explain why in the PR description. Use a new ADR if the change contradicts an existing one.
 - Prefer pure functions in `packages/core` with tests over logic inside browser event handlers.

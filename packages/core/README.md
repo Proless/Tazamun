@@ -36,28 +36,28 @@ try {
 const winner = hlc.compare(a, b) >= 0 ? a : b;
 ```
 
-Crypto, from account creation to one record:
+Crypto, from account creation to one record. Import the namespace under another name: a local `crypto` would hide the global Web Crypto `crypto` in that file.
 
 ```ts
-import { crypto } from '@tazamun/core';
+import { crypto as tzCrypto } from '@tazamun/core';
 
 // Account creation (ACC-1…3). Sign-in repeats deriveMasterKeys with the salt and params from prelogin.
-const accountId = crypto.randomId();
-const salt = crypto.randomBytes(crypto.SALT_BYTES);
-const { authKey, kek } = await crypto.deriveMasterKeys(passphrase, salt, crypto.DEFAULT_KDF_PARAMS);
-const accountKey = crypto.generateAccountKey();
-const wrappedAccountKey = await crypto.wrapAccountKey(kek, accountKey, accountId);
+const accountId = tzCrypto.randomId();
+const salt = tzCrypto.randomBytes(tzCrypto.SALT_BYTES);
+const { authKey, kek } = await tzCrypto.deriveMasterKeys(passphrase, salt, tzCrypto.DEFAULT_KDF_PARAMS);
+const accountKey = tzCrypto.generateAccountKey();
+const wrappedAccountKey = await tzCrypto.wrapAccountKey(kek, accountKey, accountId);
 // Send accountId, salt, params, wrappedAccountKey and hashAuthKey(authKey) to the server.
 
 // Per record (SEC-3): the AAD binds the ciphertext to its account, collection and record.
-const keys = await crypto.deriveAccountKeys(accountKey);
+const keys = await tzCrypto.deriveAccountKeys(accountKey);
 const key = await keys.collectionKey('tabs');
 const address = { accountId, collection: 'tabs', recordId: deviceId };
-const payload = await crypto.encryptPayload(key, address, schemaPayload);
-const decrypted = await crypto.decryptPayload(key, address, payload); // DecryptError if moved or tampered
+const payload = await tzCrypto.encryptPayload(key, address, schemaPayload);
+const decrypted = await tzCrypto.decryptPayload(key, address, payload); // DecryptError if moved or tampered
 
 // History record IDs (HIS-1).
-const id = await crypto.keyedId(await keys.historyIdKey(), normalizedUrl);
+const id = await tzCrypto.keyedId(await keys.historyIdKey(), normalizedUrl);
 ```
 
 `deriveMasterKeys` takes about 0.5–1 s on purpose. Call it at sign-in and unlock only.
@@ -65,7 +65,7 @@ const id = await crypto.keyedId(await keys.historyIdKey(), normalizedUrl);
 Schemas validate what comes off the wire and out of decryption:
 
 ```ts
-import { schema } from '@tazamun/core';
+import { hlc, schema } from '@tazamun/core';
 
 // Server response (plaintext envelope only).
 const page = schema.pullResponse.parse(await response.json());
@@ -86,7 +86,18 @@ const payload = schema.livePayload(schema.COLLECTIONS.tabs, hlc.serialize(clock)
 const tombstone = schema.tombstonePayload(schema.COLLECTIONS.tabs, hlc.serialize(clock));
 ```
 
+Apps that parse with these schemas must call `z.config({ jitless: true })` at startup when they run under a CSP without `eval` (extension, dashboard).
+
 The package exports its TypeScript source directly (`"exports": "./src/index.ts"`); there is no build step.
+
+## Dependencies
+
+| Package | Why |
+| ------- | --- |
+| `zod` | Schemas for the wire format and payloads |
+| `hash-wasm` | Argon2id, which Web Crypto doesn't provide ([ADR-0008](../../docs/adr/0008-crypto-implementation.md)). Needs `'wasm-unsafe-eval'` in an extension CSP. |
+
+Everything else (HKDF, AES-GCM, HMAC, SHA-256, randomness) comes from Web Crypto. Development only: `vitest`, `fast-check`, and `@vitest/browser-playwright` with `playwright` for the browser tests.
 
 ## Scripts
 
@@ -111,13 +122,21 @@ src/
     keys.ts       account key, wrapping, HKDF collection and history-ID keys
     record.ts     payload encryption with AAD accountId|collection|recordId
     ids.ts        keyed record IDs (HMAC, 128 bits)
+    *.test.ts     crypto.test.ts (behaviour), vectors.test.ts (published vectors), format.test.ts (format v1)
   hlc/            hlc.ts, hlc.test.ts, index.ts
   schema/
     primitives.ts record ID, device ID, HLC stamp, timestamps, base64url
     envelope.ts   HTTP API wire format (records, pull, push, errors, limits)
     payload.ts    decrypted payload {v, deleted, hlc, data}, decodePayload, versioning
     collections/  one file per collection: tabs, commands, history, extensions
-test/vectors/     published crypto vectors (each file names its source) and Tazamun format vectors
+test/vectors/
+  argon2id-reference.json      Argon2 reference implementation, test.c
+  hkdf-sha256-rfc5869.json     RFC 5869
+  hmac-sha256-rfc4231.json     RFC 4231
+  aes-256-gcm-wycheproof.json  Wycheproof (39 valid, 27 must-reject)
+  tazamun-format-v1.json       Tazamun's own formats, pinned (see ADR-0008)
+vitest.config.ts          Node test project (core)
+vitest.browser.config.ts  Chromium and Firefox test project (core-browser)
 ```
 
 Unit tests live next to the code as `*.test.ts`. Property-based tests use [fast-check](https://fast-check.dev).

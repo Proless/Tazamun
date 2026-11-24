@@ -5,11 +5,12 @@ Read this before changing anything in `packages/core`. The repository-wide rules
 ## Rules for this package
 
 1. **No browser-extension, DOM or server APIs.** Only what Node 26 and current browsers share: ECMAScript, Web Crypto (`globalThis.crypto`), `TextEncoder`, `URL`. Code that needs `browser.*`, IndexedDB or SQLite belongs in an app.
-2. **Pure functions.** Pass in time (`now`), randomness and state; return new values. No module-level mutable state, no I/O, no logging.
-3. **Everything is tested in Node.** Merge functions, schemas and the HLC get property-based tests (fast-check), not only examples. Crypto also runs in a browser (P0 exit criterion).
+2. **Pure functions.** Pass in time (`now`) and state; return new values. No module-level mutable state, no I/O, no logging. The only exception is randomness in `crypto`: `seal` draws its own nonce, and `randomBytes`, `randomId` and `generateAccountKey` exist to create secrets. Callers must never supply nonces or keys from their own randomness.
+3. **Everything is tested in Node and in browsers.** Every test runs in Node and in Chromium and Firefox. Merge functions, schemas and the HLC get property-based tests (fast-check), not only examples.
 4. **Stored formats are versioned.** Serialized HLCs, schemas, URL normalization and crypto parameters end up in users' records. Changing one needs a schema version bump and a migration, and usually an ADR.
 5. **Public API goes through `src/index.ts`**, one namespace per module (`export * as hlc from './hlc/index.ts'`). Don't make apps import from deep paths.
-6. **Throw typed errors** (`class XError extends Error`) for conditions callers must handle, such as `HlcDriftError`. Use `RangeError` for invalid arguments.
+6. **Throw typed errors** (`class XError extends Error`) for conditions callers must handle, such as `HlcDriftError` and `DecryptError`. Use `RangeError` for invalid arguments.
+7. **Few dependencies.** Runtime dependencies are `zod` and `hash-wasm` only. A new one needs a reason in the PR (SEC-7), must pass `pnpm licenses:check`, and must run in Node, browsers and an MV3 service worker. List it in the README's Dependencies table.
 
 ## Pitfalls
 
@@ -38,6 +39,7 @@ Read this before changing anything in `packages/core`. The repository-wide rules
 - Test vectors live in `test/vectors/`: Argon2id from the reference implementation's `test.c` (RFC 9106's own vector needs associated data, which `hash-wasm` doesn't support), HKDF from RFC 5869, HMAC from RFC 4231, AES-GCM from Wycheproof.
 
 ### TypeScript and Web Crypto
+- The public namespace `crypto` hides the global Web Crypto `crypto` in any file that imports it under that name. Import it as `import { crypto as tzCrypto } from '@tazamun/core'`. Inside this package, the `crypto` module's own files use the global `crypto` and never import the namespace.
 - The base tsconfig has no DOM lib, so names like `AesKeyGenParams` or `KeyUsage` don't exist. Take types from the API itself: `Parameters<typeof crypto.subtle.deriveKey>[2]`.
 - Web Crypto wants `Uint8Array<ArrayBuffer>`, not plain `Uint8Array` (which may be backed by a `SharedArrayBuffer`). Return `Uint8Array<ArrayBuffer>` from helpers that produce bytes for Web Crypto.
 
