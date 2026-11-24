@@ -5,7 +5,7 @@ The Tazamun sync server: a deliberately simple store of encrypted records, with 
 | Part | Status |
 | ---- | ------ |
 | HTTP API `/v1` ([SRS 4.4](<../../docs/srs/4. External Interface Requirements.md#44-communications-interfaces>)): info, health, accounts, prelogin, sessions, keys, devices, collections | Done |
-| Configuration from `TAZAMUN_*` variables, validated, with `*_FILE` secrets and a generated reference (ADM-1, DEP-12…15) | Done |
+| Configuration from `TAZAMUN_*` variables and an optional JSON file, validated, with `*_FILE` secrets and a generated reference (ADM-1, DEP-12…15) | Done |
 | Migrations on startup with a backup first; refuses newer databases (ADM-4, DEP-24) | Done |
 | Quotas, rate limits, registration modes (ADM-2, ADM-3, SEC-9) | Done |
 | Structured logs without bodies, tokens or record IDs (ADM-7, DEP-8) | Done |
@@ -21,7 +21,7 @@ cp apps/server/.env.example apps/server/.env   # once; local settings for develo
 pnpm --filter @tazamun/server dev             # restarts on changes
 ```
 
-`dev` reads `apps/server/.env` (git-ignored) and stores data in `apps/server/data-local/`. The server runs its TypeScript source directly with Node's type stripping; there is no build step yet. Every setting is listed in the [configuration reference](../../docs/guides/server-configuration.md), which is generated from [`src/config.ts`](src/config.ts).
+`dev` reads `apps/server/.env` (git-ignored) and stores data in `apps/server/data-local/`. The server runs its TypeScript source directly with Node's type stripping; there is no build step yet. Settings can also come from a JSON file named by `TAZAMUN_CONFIG_FILE`; environment variables override it. Every setting, its file key and the precedence rules are in the [configuration reference](../../docs/guides/server-configuration.md), which is generated from [`src/config.ts`](src/config.ts).
 
 `node src/main.ts` is the production entry point. Run node directly, not through `pnpm start`, so `SIGTERM` reaches the server and it can shut down cleanly.
 

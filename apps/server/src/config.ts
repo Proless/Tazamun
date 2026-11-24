@@ -1,6 +1,6 @@
 /**
  * Server configuration (ADM-1, DEP-12…15). Every setting is one entry in SETTINGS, which drives
- * parsing, validation, `*_FILE` secrets and the generated reference in
+ * parsing, validation, the JSON config file keys, `*_FILE` secrets and the generated reference in
  * docs/guides/server-configuration.md (`pnpm --filter @tazamun/server config:docs`).
  */
 import { z } from 'zod';
@@ -148,48 +148,116 @@ type Env = Readonly<Record<string, string | undefined>>;
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
+/** Environment variable naming the JSON config file. The file can't name itself. */
+export const CONFIG_FILE_ENV = 'TAZAMUN_CONFIG_FILE';
+
+type FileValues = Readonly<Record<string, unknown>>;
+
+/** Read the JSON config file: one object whose keys are SETTINGS keys. */
+function readConfigFile(
+  path: string,
+  readFile: (path: string) => string,
+  problems: string[],
+): FileValues {
+  let text: string;
+  try {
+    text = readFile(path);
+  } catch {
+    problems.push(`${CONFIG_FILE_ENV}: can't read the file ${path}`);
+    return {};
+  }
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    problems.push(`${path} is not valid JSON`);
+    return {};
+  }
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    problems.push(`${path} must contain one JSON object`);
+    return {};
+  }
+  // Everything in the file is meant for us, so an unknown key is a typo: refuse it.
+  for (const key of Object.keys(data)) {
+    if (!Object.hasOwn(SETTINGS, key)) {
+      problems.push(`${path}: unknown setting "${key}"`);
+    }
+  }
+  return data as FileValues;
+}
+
+interface RawValue {
+  readonly raw: string;
+  /** Where the value came from, for error messages. */
+  readonly source: string;
+}
+
 /**
- * Parse and validate the environment (DEP-13). Throws ConfigError naming every bad variable and
- * the expected format. `readFile` reads `*_FILE` secrets; it's injected for tests.
+ * Parse and validate the configuration (DEP-13). Each setting comes from, in order of
+ * precedence: its environment variable (or `<env>_FILE` for secrets), the JSON file named by
+ * TAZAMUN_CONFIG_FILE, or its default. Throws ConfigError naming every bad value and the expected
+ * format. `readFile` reads the config file and `*_FILE` secrets; it's injected for tests.
  */
 export function loadConfig(env: Env, readFile: (path: string) => string): LoadedConfig {
   const problems: string[] = [];
   const warnings: string[] = [];
   const values: Record<string, unknown> = {};
-  const known = new Set<string>();
+  const known = new Set<string>([CONFIG_FILE_ENV]);
+
+  const configPath = nonEmpty(env[CONFIG_FILE_ENV]);
+  const fromFile = configPath === undefined ? {} : readConfigFile(configPath, readFile, problems);
 
   for (const [key, s] of Object.entries(SETTINGS) as [string, Setting<unknown>][]) {
     known.add(s.env);
-    let raw = nonEmpty(env[s.env]);
+    let value: RawValue | undefined;
+    const envValue = nonEmpty(env[s.env]);
+    if (envValue !== undefined) value = { raw: envValue, source: s.env };
     if (s.secret) {
       const fileVar = `${s.env}_FILE`;
       known.add(fileVar);
-      const file = nonEmpty(env[fileVar]);
-      if (file !== undefined && raw !== undefined) {
+      const secretPath = nonEmpty(env[fileVar]);
+      if (secretPath !== undefined && value !== undefined) {
         problems.push(`${s.env} and ${fileVar} are both set; set only one`);
         continue;
       }
-      if (file !== undefined) {
+      if (secretPath !== undefined) {
         try {
-          raw = readFile(file).replace(/\r?\n$/, '');
+          value = { raw: readFile(secretPath).replace(/\r?\n$/, ''), source: fileVar };
         } catch {
-          problems.push(`${fileVar}: can't read the file ${file}`);
+          problems.push(`${fileVar}: can't read the file ${secretPath}`);
           continue;
         }
       }
     }
-    raw ??= s.default;
-    if (raw === undefined) {
-      if (s.required) problems.push(`${s.env} is required (expected ${s.format})`);
+    if (value === undefined && Object.hasOwn(fromFile, key)) {
+      const v = fromFile[key];
+      const source = `"${key}" in ${configPath ?? ''}`;
+      // JSON values are turned into the same text an environment variable would hold.
+      if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+        value = { raw: String(v), source };
+      } else {
+        problems.push(`${source} must be a string, number or boolean (expected ${s.format})`);
+        continue;
+      }
+    }
+    if (value === undefined && s.default !== undefined) {
+      value = { raw: s.default, source: `default of ${s.env}` };
+    }
+    if (value === undefined) {
+      if (s.required) {
+        problems.push(
+          `${s.env} (or "${key}" in the config file) is required (expected ${s.format})`,
+        );
+      }
       continue;
     }
-    const parsed = s.schema.safeParse(raw);
+    const parsed = s.schema.safeParse(value.raw);
     if (parsed.success) {
       values[key] = parsed.data;
     } else {
       // Secrets are never echoed back, other values are, to make typos easy to spot.
-      const shown = s.secret ? '' : ` (got "${raw}")`;
-      problems.push(`${s.env} is invalid${shown}: expected ${s.format}`);
+      const shown = s.secret ? '' : ` (got "${value.raw}")`;
+      problems.push(`${value.source} is invalid${shown}: expected ${s.format}`);
     }
   }
 
@@ -227,22 +295,46 @@ function nonEmpty(value: string | undefined): string | undefined {
 
 /** The configuration reference (DEP-15), generated from SETTINGS. */
 export function renderConfigReference(): string {
-  const rows = Object.values(SETTINGS).map((s: Setting<unknown>) => {
+  const entries = Object.entries(SETTINGS) as [string, Setting<unknown>][];
+  const rows = entries.map(([key, s]) => {
     const name = s.secret ? `\`${s.env}\`<br>\`${s.env}_FILE\`` : `\`${s.env}\``;
     const def = s.required ? '**required**' : s.default === undefined ? '—' : `\`${s.default}\``;
-    return `| ${name} | ${def} | ${s.format} | ${s.description} |`;
+    return `| ${name} | \`${key}\` | ${def} | ${s.format} | ${s.description} |`;
   });
   return [
     '# Server configuration',
     '',
     '<!-- Generated from apps/server/src/config.ts by `pnpm --filter @tazamun/server config:docs`. Do not edit by hand. -->',
     '',
-    'The server reads all configuration from environment variables (ADM-1, DEP-12). It checks every value at startup and refuses to start, naming the variable, if one is missing or invalid (DEP-13). Unknown `TAZAMUN_*` variables are logged as warnings, to catch typos.',
+    'The server reads its configuration from environment variables and, optionally, a JSON file (ADM-1, DEP-12). It checks every value at startup and refuses to start, naming the setting, if one is missing or invalid (DEP-13).',
     '',
-    'Variables with a `_FILE` variant read the value from that file instead (for Docker and Kubernetes secrets). Set only one of the two.',
+    '## Where settings come from',
     '',
-    '| Variable | Default | Format | Description |',
-    '| -------- | ------- | ------ | ----------- |',
+    'Each setting is taken from the first of these that sets it:',
+    '',
+    '1. Its environment variable, or for secrets its `_FILE` variant, which reads the value from that file (for Docker and Kubernetes secrets). Set only one of the two.',
+    `2. The JSON config file named by \`${CONFIG_FILE_ENV}\`, under the key in the *File key* column.`,
+    '3. Its default.',
+    '',
+    'So a config file can hold the base settings, and environment variables (for example in a Compose file) can override single values. Empty environment variables count as unset.',
+    '',
+    'The config file is one JSON object. Values may be strings, numbers or booleans. Unknown keys are an error, because everything in the file is meant for Tazamun. Unknown `TAZAMUN_*` environment variables are only logged as warnings, to catch typos. The file may contain secrets; protect it like one.',
+    '',
+    '```json',
+    '{',
+    '  "publicUrl": "https://sync.example.org",',
+    '  "registration": "invite",',
+    '  "storageQuotaMb": 500,',
+    '  "trustProxy": true',
+    '}',
+    '```',
+    '',
+    '## Settings',
+    '',
+    `\`${CONFIG_FILE_ENV}\` (environment only): path to the JSON config file. Default: none.`,
+    '',
+    '| Variable | File key | Default | Format | Description |',
+    '| -------- | -------- | ------- | ------ | ----------- |',
     ...rows,
     '',
   ].join('\n');

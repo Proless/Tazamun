@@ -10,7 +10,7 @@ Read this before changing anything in `apps/server`. The repository-wide rules i
 4. **Wire shapes live in `packages/core`** (`schema/api.ts`, `schema/envelope.ts`), so clients validate the same schemas. Don't define request or response bodies in the server. Error codes are in `schema.ERROR_CODES` and [SRS 4.4.4](<../../docs/srs/4. External Interface Requirements.md#444-error-codes>): add codes, never rename them.
 5. **Logging goes through `src/log.ts` only**, whose `LogFields` type is the allow-list. Never log bodies, headers, concrete paths (they contain account and device IDs), tokens, auth keys, device names or record IDs (ADM-7). Log `routePath(c, -1)`, the route pattern, instead of the path. A test checks that none of these values appear in logs; extend it when you add a route.
 6. **Error messages never echo request values.** Validation errors name the field path and the zod issue code only (`src/http/validate.ts`). Config errors may echo non-secret values to help with typos, never secrets.
-7. **Every setting is one entry in `SETTINGS`** (`src/config.ts`), and the reference in `docs/guides/server-configuration.md` is generated from it. After changing a setting, run `pnpm --filter @tazamun/server config:docs`; `config.test.ts` fails otherwise (DEP-15).
+7. **Every setting is one entry in `SETTINGS`** (`src/config.ts`). Its key is the config-file key and its `env` the variable name; renaming either breaks existing deployments, so treat both as stable. The reference in `docs/guides/server-configuration.md` is generated from it. After changing a setting, run `pnpm --filter @tazamun/server config:docs`; `config.test.ts` fails otherwise (DEP-15).
 8. **Inject time and services.** Routes take `now()` and other services from `Services`, so tests control the clock. No module-level state other than what `main.ts` builds.
 
 ## Pitfalls
@@ -29,6 +29,11 @@ Read this before changing anything in `apps/server`. The repository-wide rules i
 - Throw `ApiError` from handlers and middleware; `app.onError` turns it into the SRS 4.4.1 error body. Anything else becomes a logged `500 INTERNAL`.
 - `bodyLimit` runs before the handler reads the body; its `onError` throws an `ApiError` so the response has the standard shape.
 - `@hono/node-server`'s `serve` returns Node's `http.Server`. On shutdown call `close()` and `closeIdleConnections()`, or idle keep-alive connections hold the server open until the grace period ends.
+
+### Configuration
+- Precedence is environment variable (or `*_FILE`) > config file > default. Keep it that way: Compose files and Kubernetes manifests rely on overriding single values from the environment.
+- Unknown keys in the config file are errors; unknown `TAZAMUN_*` variables only warnings, because the environment also holds other programs' variables.
+- JSON values are turned into the text an environment variable would hold before validation, so each setting has one parser. A setting that needs a list or object would need a different approach for the environment anyway.
 
 ### Security
 - Compare hashes with `hashesEqual` (constant time). For an unknown account, `verifyAuthKey` still hashes and compares against a dummy, so timing doesn't reveal whether the account exists.

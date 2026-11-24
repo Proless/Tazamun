@@ -38,7 +38,9 @@ describe('loadConfig', () => {
   });
 
   it('requires TAZAMUN_PUBLIC_URL (DEP-14)', () => {
-    expect(problems({})).toEqual([expect.stringContaining('TAZAMUN_PUBLIC_URL is required')]);
+    expect(problems({})).toEqual([
+      expect.stringContaining('TAZAMUN_PUBLIC_URL (or "publicUrl" in the config file) is required'),
+    ]);
   });
 
   it('names each invalid variable and the expected format (DEP-13)', () => {
@@ -95,6 +97,98 @@ describe('loadConfig', () => {
     );
     expect(config.port).toBe(8080);
     expect(warnings).toEqual(['Unknown setting TAZAMUN_PROT is ignored']);
+  });
+});
+
+describe('JSON config file', () => {
+  const PATH = '/etc/tazamun/config.json';
+  const withFile =
+    (content: unknown) =>
+    (path: string): string => {
+      expect(path).toBe(PATH);
+      return typeof content === 'string' ? content : JSON.stringify(content);
+    };
+
+  it('reads typed JSON values under the settings keys', () => {
+    const { config } = loadConfig(
+      { TAZAMUN_CONFIG_FILE: PATH },
+      withFile({
+        publicUrl: 'https://sync.example.org',
+        port: 9000,
+        trustProxy: true,
+        registration: 'open',
+      }),
+    );
+    expect(config).toMatchObject({ port: 9000, trustProxy: true, registration: 'open' });
+    expect(config.publicUrl.host).toBe('sync.example.org');
+  });
+
+  it('lets environment variables override the file, and the file override defaults', () => {
+    const { config } = loadConfig(
+      { TAZAMUN_CONFIG_FILE: PATH, TAZAMUN_PORT: '7000', TAZAMUN_LOG_LEVEL: '' },
+      withFile({ publicUrl: 'https://a.example.org', port: 9000, logLevel: 'warn' }),
+    );
+    expect(config.port).toBe(7000);
+    // An empty variable counts as unset, so the file's value applies.
+    expect(config.logLevel).toBe('warn');
+    expect(config.storageQuotaMb).toBe(200);
+  });
+
+  it('lets a *_FILE secret override the config file', () => {
+    const secret = 's'.repeat(40);
+    const { config } = loadConfig(
+      { TAZAMUN_CONFIG_FILE: PATH, TAZAMUN_INSTANCE_SECRET_FILE: '/run/secrets/s' },
+      (path) =>
+        path === PATH
+          ? JSON.stringify({ publicUrl: 'https://a.example.org', instanceSecret: 'f'.repeat(40) })
+          : secret,
+    );
+    expect(config.instanceSecret).toBe(secret);
+  });
+
+  it('refuses unknown keys, wrong types and names the file key in errors', () => {
+    const found = problems(
+      { TAZAMUN_CONFIG_FILE: PATH },
+      withFile({ publicUrl: 'https://a.example.org', prot: 1, port: 'eighty', trustProxy: [true] }),
+    );
+    expect(found).toEqual([
+      `${PATH}: unknown setting "prot"`,
+      expect.stringMatching(/^"port" in \/etc\/tazamun\/config.json is invalid \(got "eighty"\)/),
+      expect.stringContaining(
+        '"trustProxy" in /etc/tazamun/config.json must be a string, number or boolean',
+      ),
+    ]);
+  });
+
+  it('reports unreadable files, invalid JSON and non-objects', () => {
+    expect(
+      problems({ TAZAMUN_CONFIG_FILE: PATH }, () => {
+        throw new Error('ENOENT');
+      }),
+    ).toContain(`TAZAMUN_CONFIG_FILE: can't read the file ${PATH}`);
+    expect(problems({ TAZAMUN_CONFIG_FILE: PATH }, withFile('{ "port": 1, }'))).toContain(
+      `${PATH} is not valid JSON`,
+    );
+    expect(problems({ TAZAMUN_CONFIG_FILE: PATH }, withFile([1, 2]))).toContain(
+      `${PATH} must contain one JSON object`,
+    );
+  });
+
+  it('never echoes a secret from the file', () => {
+    const found = problems(
+      { TAZAMUN_CONFIG_FILE: PATH },
+      withFile({ publicUrl: 'https://a.example.org', instanceSecret: 'shortFileSecret' }),
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0]).not.toContain('shortFileSecret');
+  });
+
+  it("doesn't warn about TAZAMUN_CONFIG_FILE itself", () => {
+    const { warnings } = loadConfig(
+      { TAZAMUN_CONFIG_FILE: PATH },
+      withFile({ publicUrl: 'https://a.example.org' }),
+    );
+    expect(warnings).toEqual([]);
   });
 });
 
