@@ -1,0 +1,13 @@
+{
+  "name": "@tazamun/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Schemas, crypto, HLC, merge functions and API client. No browser-specific APIs.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

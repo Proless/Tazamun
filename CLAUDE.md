@@ -6,31 +6,31 @@ Guidance for Claude (and human contributors) working in this repository: what th
 
 **One extension, one account, and one place for your browser data across Chrome, Edge and Firefox. End-to-end encrypted and self-hostable.**
 
-The goal is consolidation: replace a separate bookmark syncer, tab manager and history tool (each with its own account) with one product. Data types for 1.0: **tabs, history, bookmarks, extension inventory**. Passwords, cookies and browser settings are permanently out of scope (see [SRS 1.2](<srs/1. Introduction.md#12-product-vision>)).
+The goal is consolidation: replace a separate bookmark syncer, tab manager and history tool (each with its own account) with one product. Data types for 1.0: **tabs, history, bookmarks, extension inventory**. Passwords, cookies and browser settings are permanently out of scope (see [SRS 1.2](<docs/srs/1. Introduction.md#12-product-vision>)).
 
 ## Current status
 
-- **Phase:** P0 (foundations). **No code exists yet**; the repository contains only the SRS and ADRs.
-- The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<srs/2. Overall Description.md#22-architecture>), [2.3](<srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
-- `srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
+- **Phase:** P0 (foundations). The pnpm workspace, tooling and CI are set up; `packages/core` exists but is still empty.
+- The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
+- `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
 ## Sources of truth
 
 | What | Where |
 | ---- | ----- |
-| Requirements with IDs (`ACC-`, `ENG-`, `TAB-`, `HIS-`, `BMK-`, `EXT-`, `DSH-`, `UI-`, `IMP-`, `ADM-`, `DEP-`, `PERF-`, `SEC-`, `PRIV-`, `REL-`) | [`srs/`](srs/) sections 1–6 |
-| Design decisions and why | [`srs/adr/`](srs/adr/README.md) |
-| HTTP API and record envelope | [SRS section 4.4](<srs/4. External Interface Requirements.md#44-communications-interfaces>) |
-| Self-hosting, container image, publishing pipeline | [SRS section 3.11](<srs/3. Software Features.md#311-self-hosting-containers-and-image-publishing>), [ADR-0007](srs/adr/0007-container-distribution.md) |
-| Crypto parameters and threat model | [SRS section 5.2](<srs/5. Other Nonfunctional Requirements.md#52-security-requirements>) |
+| Requirements with IDs (`ACC-`, `ENG-`, `TAB-`, `HIS-`, `BMK-`, `EXT-`, `DSH-`, `UI-`, `IMP-`, `ADM-`, `DEP-`, `PERF-`, `SEC-`, `PRIV-`, `REL-`) | [`docs/srs/`](docs/srs/) sections 1–6 |
+| Design decisions and why | [`docs/adr/`](docs/adr/README.md) |
+| HTTP API and record envelope | [SRS section 4.4](<docs/srs/4. External Interface Requirements.md#44-communications-interfaces>) |
+| Self-hosting, container image, publishing pipeline | [SRS section 3.11](<docs/srs/3. Software Features.md#311-self-hosting-containers-and-image-publishing>), [ADR-0007](docs/adr/0007-container-distribution.md) |
+| Crypto parameters and threat model | [SRS section 5.2](<docs/srs/5. Other Nonfunctional Requirements.md#52-security-requirements>) |
 | Roadmap, gaps, pitfalls | this file |
 
 If the code and the SRS disagree, fix one of them in the same pull request. Don't leave them out of sync.
 
 ## Rules that never change
 
-1. **The server never sees plaintext.** No feature may require it ([ADR-0002](srs/adr/0002-end-to-end-encryption-dumb-server.md)). That includes "just for search", "just for the dashboard", and "just for debugging".
-2. **The engine contains no code specific to a data type.** Data types are modules ([ADR-0001](srs/adr/0001-one-product-module-architecture.md)).
+1. **The server never sees plaintext.** No feature may require it ([ADR-0002](docs/adr/0002-end-to-end-encryption-dumb-server.md)). That includes "just for search", "just for the dashboard", and "just for debugging".
+2. **The engine contains no code specific to a data type.** Data types are modules ([ADR-0001](docs/adr/0001-one-product-module-architecture.md)).
 3. **Merge functions are pure** and live in `packages/core`. They're tested in Node, never only in a browser.
 4. **Never trust browser events as the source of truth.** Events trigger a diff against the mirror.
 5. **Never log plaintext,** URLs, titles, keys, tokens, passphrases or history record IDs. Not on the client, not on the server.
@@ -38,26 +38,45 @@ If the code and the SRS disagree, fix one of them in the same pull request. Don'
 7. **Never capture private or incognito browsing.**
 8. Every hard-to-reverse decision gets an ADR. Reference requirement IDs in commits and PRs (e.g. `feat(tabs): send tab to device (TAB-7)`).
 
-## Planned repository layout ([ADR-0004](srs/adr/0004-typescript-monorepo-stack.md))
+## Planned repository layout ([ADR-0004](docs/adr/0004-typescript-monorepo-stack.md))
 
-```
-packages/core        schemas (zod), crypto, HLC, merge functions, API client; no browser APIs
-packages/ui          shared Vue 3 components
-apps/extension       WXT; modules in src/modules/<type>/; engine in src/engine/
-apps/server          Node.js LTS + Hono/Fastify + SQLite; serves the dashboard build
-apps/dashboard       Vue 3 + Vite SPA
+```text
+apps/
+  extension/         WXT; engine in src/engine/, modules in src/modules/<type>/
+  server/            Node.js LTS + Hono/Fastify + SQLite; serves the dashboard build
+  dashboard/         Vue 3 + Vite SPA
+packages/
+  core/              schemas (zod), crypto, HLC, merge functions, API client; no browser APIs
+  ui/                shared Vue 3 components
 data/                extension-equivalents.json
-deploy/docker/       Dockerfile (multi-stage), .dockerignore
-deploy/compose/      docker-compose.yml, docker-compose.caddy.yml, .env.example
-deploy/proxy/        Caddy / Traefik / nginx examples
-deploy/k8s/          example manifests (one replica + PVC)
+deploy/
+  docker/            Dockerfile (multi-stage), .dockerignore
+  compose/           docker-compose.yml, docker-compose.caddy.yml, .env.example
+  proxy/             Caddy / Traefik / nginx examples
+  k8s/               example manifests (one replica + PVC)
+docs/
+  srs/               requirements (sections 1–6)
+  adr/               architecture decision records
+  guides/            user, self-hosting and contributor docs (from P1)
+scripts/             repository maintenance scripts
 .github/workflows/   ci.yml (lint, test, image build + smoke test), publish-edge.yml, release.yml
-srs/                 requirements + adr/
 ```
+
+Each app and package has the same shape: `src/` for code, unit tests next to it as `*.test.ts`, shared fixtures and test vectors in `test/`, plus its own `package.json`, `tsconfig.json` and `vitest.config.ts`. Root config (`tsconfig.base.json`, `eslint.config.js`, `vitest.config.ts`, `.prettierrc.json`) applies to all of them. Create a folder only when it gets real content.
 
 Image: `ghcr.io/proless/tazamun` (`edge` from `main`; `X.Y.Z`, `X.Y`, `X`, `latest` from tags).
 
-Commands (fill these in once P0 lands): `pnpm install`, `pnpm test`, `pnpm lint`, `pnpm --filter extension dev`, `pnpm --filter server dev`, `docker compose up`.
+Commands (Node 26, pnpm 12; install pnpm with `npm install -g pnpm`, since Node 25+ no longer ships corepack):
+
+| Command | What it does |
+| ------- | ------------ |
+| `pnpm install` | Install all workspace dependencies |
+| `pnpm test` | Run every package's Vitest project |
+| `pnpm lint` | ESLint (type-aware) over the whole repo |
+| `pnpm typecheck` | `tsc --noEmit` in every package |
+| `pnpm format` / `pnpm format:check` | Prettier write / check |
+
+Still to come: `pnpm --filter extension dev`, `pnpm --filter server dev`, `docker compose up`.
 
 ---
 
@@ -67,9 +86,9 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 
 ### P0: Foundations (1–2 weeks)
 
-- [ ] Set up the pnpm workspace with the layout above. TypeScript strict mode, ESLint and Prettier, Vitest.
-- [ ] GitHub Actions: lint, type-check, tests, dependency audit, license check on every PR.
-- [ ] Renovate or Dependabot configured for npm, GitHub Actions and Docker base-image digests (DEP-37).
+- [x] Set up the pnpm workspace with the layout above. TypeScript strict mode, ESLint and Prettier, Vitest.
+- [ ] GitHub Actions: lint, type-check, tests, dependency audit, license check on every PR. *(All but the license check are in `ci.yml`.)*
+- [ ] Renovate or Dependabot configured for npm, GitHub Actions and Docker base-image digests (DEP-37). *(npm and Actions done; add Docker when the Dockerfile lands.)*
 - [ ] `packages/core/crypto`: Argon2id (WASM), HKDF, AES-GCM wrap and unwrap, payload encrypt and decrypt with AAD. **Test vectors** committed.
 - [ ] `packages/core/hlc`: HLC with tests (monotonic, clock skew, comparison including device ID).
 - [ ] `packages/core/schema`: record envelope plus a payload schema per collection (zod), with schema versions.
@@ -120,7 +139,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 
 ### P4: Bookmarks (6–8 weeks): the hardest part
 
-- [ ] Read [ADR-0006](srs/adr/0006-bookmark-safety.md) again first.
+- [ ] Read [ADR-0006](docs/adr/0006-bookmark-safety.md) again first.
 - [ ] Node record, GUID-to-native-ID map, canonical roots, fractional positions (BMK-1…4). Settle Q5.
 - [ ] Merge: last writer wins per field, edit wins over delete, cycle repair, orphan recovery. **Property-based tests with 2–3 simulated devices must converge with no cycles and no lost nodes** (BMK-5…7, REL-6).
 - [ ] Reconcile by diffing against the mirror; echo suppression; the post-apply diff must be empty (BMK-9, BMK-10).
@@ -164,7 +183,7 @@ Firefox for Android · Helm chart · push notifications instead of polling · ke
 
 ## Known gaps (accepted for 1.0)
 
-From [SRS 6.5](<srs/6. Other Requirements.md#65-known-limitations-and-open-questions>). Don't "fix" these casually; each needs an ADR.
+From [SRS 6.5](<docs/srs/6. Other Requirements.md#65-known-limitations-and-open-questions>). Don't "fix" these casually; each needs an ADR.
 
 - A lost passphrase with no signed-in device means lost data. No server-side recovery is possible by design.
 - A malicious server can withhold or roll back records, and can serve a backdoored dashboard.
@@ -172,17 +191,23 @@ From [SRS 6.5](<srs/6. Other Requirements.md#65-known-limitations-and-open-quest
 - No sync for data without extension APIs: Firefox bookmark tags and keywords, tab group colours, passwords, settings.
 - Record sizes and timing aren't padded, so traffic analysis can reveal activity patterns.
 - Desktop only. Chrome and Edge on Android can't run the extension.
-- One server instance per `/data`, on local storage only (SQLite). No horizontal scaling and no high availability in 1.0 ([ADR-0007](srs/adr/0007-container-distribution.md)).
-- The browser's own address-bar autocomplete won't suggest pages visited only in other browsers (use `tz`) ([ADR-0005](srs/adr/0005-history-stored-in-extension.md)).
+- One server instance per `/data`, on local storage only (SQLite). No horizontal scaling and no high availability in 1.0 ([ADR-0007](docs/adr/0007-container-distribution.md)).
+- The browser's own address-bar autocomplete won't suggest pages visited only in other browsers (use `tz`) ([ADR-0005](docs/adr/0005-history-stored-in-extension.md)).
 - Open questions Q1–Q6 in SRS 6.5 are still to be decided.
 
 ## Pitfalls (read before working in each area)
+
+### Tooling
+- **typescript-eslint supports TypeScript only below 6.1.** TypeScript 7 (the native port) is out, but stay on `typescript ~6.0` until typescript-eslint supports it.
+- Node 25+ no longer bundles corepack, so `packageManager` in `package.json` isn't enforced automatically. CI uses `pnpm/action-setup`, which reads it.
+- Vitest 5: `passWithNoTests` is a root-only option; per-project configs (`defineProject`) reject it.
+- Workspace packages export their TypeScript source (`"exports": "./src/index.ts"`). Bundlers and Vitest handle this directly, and the base tsconfig uses `erasableSyntaxOnly`, so Node 26 can run the source with built-in type stripping. Revisit if a package is ever published to npm.
 
 ### MV3 and extension lifecycle
 - The Chrome service worker is **killed after about 30 s idle**; Firefox uses an event page. Any state in a module-level variable can vanish. Persist to IndexedDB or `storage`, and design every step to be resumable and idempotent.
 - `setTimeout`/`setInterval` don't survive suspension. Use `chrome.alarms` (Chrome minimum 30 s; Tazamun's default is 60 s).
 - Register event listeners **synchronously at top level** of the background script, or events that wake the worker will be missed.
-- No WebSockets or SSE that need to stay open. Polling `/v1/info` is the design ([ADR-0003](srs/adr/0003-sync-protocol-records-hlc.md)).
+- No WebSockets or SSE that need to stay open. Polling `/v1/info` is the design ([ADR-0003](docs/adr/0003-sync-protocol-records-hlc.md)).
 - `storage.local` is 10 MB without `unlimitedStorage`. Put history and snapshots in IndexedDB.
 - WASM (Argon2id) needs `'wasm-unsafe-eval'` in the extension CSP. Add it from day one.
 - Argon2id with 64 MiB is slow on purpose (about 0.5–1 s). Never run it on every sync, only at sign-in and unlock.
@@ -192,7 +217,7 @@ From [SRS 6.5](<srs/6. Other Requirements.md#65-known-limitations-and-open-quest
 - Different bookmark root IDs; roots are read-only; Chromium has no separators; Edge calls bookmarks "Favorites". See BMK-3.
 - Firefox refuses `tabs.create` for privileged URLs (`about:config` and others) and restricts `file:`. Fall back to copying the URL (TAB-8).
 - Firefox's `management.getAll()` returns add-on IDs, not store slugs.
-- Chrome's `history.addUrl` can't set title or time. That's one reason history isn't written back ([ADR-0005](srs/adr/0005-history-stored-in-extension.md)).
+- Chrome's `history.addUrl` can't set title or time. That's one reason history isn't written back ([ADR-0005](docs/adr/0005-history-stored-in-extension.md)).
 - `contextMenus` (Chromium) vs `menus` (Firefox); tab group APIs differ.
 - Test **every** change on Firefox too. The Chromium end-to-end setup is easier to automate, so Firefox regressions slip through.
 
