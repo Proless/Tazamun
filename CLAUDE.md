@@ -10,7 +10,7 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 
 ## Current status
 
-- **Phase:** P0 (foundations). Workspace, tooling and CI are set up. `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Left in P0: Q1.
+- **Phase:** P1 (engine, server, accounts, tabs). P0 is complete: workspace, tooling and CI are set up, and `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Q1 is decided: Hono and `node:sqlite`.
 - The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
@@ -43,7 +43,7 @@ If the code and the SRS disagree, fix one of them in the same pull request. Don'
 ```text
 apps/
   extension/         WXT; engine in src/engine/, modules in src/modules/<type>/
-  server/            Node.js LTS + Hono/Fastify + SQLite; serves the dashboard build
+  server/            Node.js LTS + Hono + node:sqlite; serves the dashboard build
   dashboard/         Vue 3 + Vite SPA
 packages/
   core/              schemas (zod), crypto, HLC, merge functions, API client; no browser APIs
@@ -101,7 +101,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 - [x] `packages/core/crypto`: Argon2id (WASM), HKDF, AES-GCM wrap and unwrap, payload encrypt and decrypt with AAD. **Test vectors** committed. *(Library choice and format details: [ADR-0008](docs/adr/0008-crypto-implementation.md).)*
 - [x] `packages/core/hlc`: HLC with tests (monotonic, clock skew, comparison including device ID).
 - [x] `packages/core/schema`: record envelope plus a payload schema per collection (zod), with schema versions. *(`bookmarks` follows in P4 and `devices` after Q2.)*
-- [ ] Settle Q1 (server framework and SQLite driver) and record it in ADR-0004.
+- [x] Settle Q1 (server framework and SQLite driver) and record it in ADR-0004. *(Hono and `node:sqlite`.)*
 - [x] Write `CONTRIBUTING.md` and a short README "How it works" section linking the SRS.
 
 **Exit:** CI green. Crypto round-trips and test vectors pass in Node **and** in a browser (Vitest browser mode or Playwright).
@@ -202,7 +202,7 @@ From [SRS 6.5](<docs/srs/6. Other Requirements.md#65-known-limitations-and-open-
 - Desktop only. Chrome and Edge on Android can't run the extension.
 - One server instance per `/data`, on local storage only (SQLite). No horizontal scaling and no high availability in 1.0 ([ADR-0007](docs/adr/0007-container-distribution.md)).
 - The browser's own address-bar autocomplete won't suggest pages visited only in other browsers (use `tz`) ([ADR-0005](docs/adr/0005-history-stored-in-extension.md)).
-- Open questions Q1–Q6 in SRS 6.5 are still to be decided.
+- Open questions Q2–Q6 in SRS 6.5 are still to be decided (Q1 is decided).
 
 ## Pitfalls (read before working in each area)
 
@@ -265,7 +265,8 @@ Pitfalls for one app or package live in that folder's `CLAUDE.md`. The sections 
 - Never log request bodies. History record IDs in logs reveal browsing patterns over time.
 
 ### Containers, self-hosting and publishing
-- **Native modules:** `better-sqlite3` compiles native code. Build it in the same base image family (glibc vs musl) and architecture as the runtime stage, or prebuilt binaries won't load. This is a strong argument for `node:sqlite` (Q1).
+- **Native modules:** the server uses the built-in `node:sqlite` (Q1), so the image needs no native builds. Keep it that way. A native dependency must be built in the same base image family (glibc vs musl) and architecture as the runtime stage, or its binaries won't load, and arm64 builds under QEMU are slow.
+- **`node:sqlite` is a release candidate in Node 26.** Keep all SQLite calls in one database module in `apps/server`, so an API change (or a switch to `better-sqlite3`) touches one place.
 - **arm64 under QEMU** is very slow, and native compiles can time out. Prefer native arm64 runners, and cache dependency layers.
 - **PID 1 and signals:** `CMD ["npm", "start"]` doesn't forward `SIGTERM` properly. Run `node` directly (or use a minimal init), or `docker stop` will kill the server without checkpointing the WAL.
 - **Non-root plus bind mounts:** a host directory owned by root won't be writable by UID 10001. Document `chown 10001:10001`, prefer named volumes, and make the server fail with a clear message when `/data` isn't writable.
