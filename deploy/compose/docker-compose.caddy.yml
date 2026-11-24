@@ -1,0 +1,89 @@
+# Tazamun with Caddy for automatic HTTPS (DEP-18). Needs ports 80 and 443 on this machine, and
+# a DNS record for TAZAMUN_DOMAIN that points here. This file and .env are all you need.
+#
+#   cp .env.example .env     # then set TAZAMUN_DOMAIN
+#   docker compose -f docker-compose.caddy.yml up -d
+#   docker compose -f docker-compose.caddy.yml exec tazamun tazamun invite create
+#
+# Guide: docs/guides/self-hosting.md
+
+name: tazamun
+
+services:
+  tazamun:
+    image: ${TAZAMUN_IMAGE:-ghcr.io/proless/tazamun:edge}
+    restart: unless-stopped
+    environment:
+      TAZAMUN_PUBLIC_URL: https://${TAZAMUN_DOMAIN:?Set TAZAMUN_DOMAIN in .env}
+      TAZAMUN_REGISTRATION: ${TAZAMUN_REGISTRATION:-invite}
+      TAZAMUN_STORAGE_QUOTA_MB: ${TAZAMUN_STORAGE_QUOTA_MB:-200}
+      TAZAMUN_LOG_LEVEL: ${TAZAMUN_LOG_LEVEL:-info}
+      # Only Caddy can reach Tazamun (no published port), so its X-Forwarded-For is trusted.
+      TAZAMUN_TRUST_PROXY: 'true'
+    volumes:
+      # Local storage only, and only one Tazamun container per volume (DEP-22).
+      - tazamun-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      tazamun:
+        condition: service_healthy
+    ports:
+      - 80:80
+      - 443:443
+      - 443:443/udp
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+    volumes:
+      # Certificates. Keep this volume, or Caddy requests new ones and may hit rate limits.
+      - caddy-data:/data
+      - caddy-config:/config
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+configs:
+  caddyfile:
+    content: |
+      ${TAZAMUN_DOMAIN} {
+        encode zstd gzip
+        # The API accepts bodies up to 2 MiB (SRS 4.4.1); leave headroom.
+        request_body {
+          max_size 4MB
+        }
+        header Strict-Transport-Security "max-age=31536000"
+        # Caddy sets X-Forwarded-For and X-Forwarded-Proto itself.
+        reverse_proxy tazamun:8080
+      }
+
+volumes:
+  tazamun-data:
+  caddy-data:
+  caddy-config:

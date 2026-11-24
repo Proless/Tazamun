@@ -1,0 +1,29 @@
+# Traefik labels for Tazamun (DEP-19). Use it on top of the plain Compose file, with an
+# existing Traefik container on the external network `traefik` that has a `websecure` entry
+# point and a certificate resolver named `letsencrypt`:
+#
+#   docker compose -f docker-compose.yml -f ../proxy/docker-compose.traefik.yml up -d
+#
+# Traefik sets X-Forwarded-For and X-Forwarded-Proto itself.
+
+services:
+  tazamun:
+    # Traefik reaches the container over the network, so no host port is needed.
+    ports: !reset []
+    networks:
+      - traefik
+    labels:
+      traefik.enable: 'true'
+      traefik.docker.network: traefik
+      traefik.http.routers.tazamun.rule: Host(`${TAZAMUN_DOMAIN}`)
+      traefik.http.routers.tazamun.entrypoints: websecure
+      traefik.http.routers.tazamun.tls.certresolver: letsencrypt
+      traefik.http.routers.tazamun.middlewares: tazamun-body,tazamun-hsts
+      traefik.http.services.tazamun.loadbalancer.server.port: '8080'
+      # The API accepts bodies up to 2 MiB (SRS 4.4.1); leave headroom.
+      traefik.http.middlewares.tazamun-body.buffering.maxRequestBodyBytes: '4194304'
+      traefik.http.middlewares.tazamun-hsts.headers.stsSeconds: '31536000'
+
+networks:
+  traefik:
+    external: true

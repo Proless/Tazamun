@@ -299,7 +299,7 @@ async function restore(args: readonly string[], io: CliIo): Promise<number> {
   if (await serverAnswers(config, io)) {
     throw new OperatorError(
       `The server is running on port ${String(config.port)}. Stop it before restoring ` +
-        '(for Compose: docker compose run --rm tazamun tazamun restore <file>).',
+        '(with Compose: docker compose stop tazamun, then docker compose run --rm --no-deps tazamun restore <file>).',
     );
   }
   const safety = join(backupDir(config), `pre-restore-${timestamp(io.now())}.db`);

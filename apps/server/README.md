@@ -11,7 +11,7 @@ The Tazamun sync server: a deliberately simple store of encrypted records, with 
 | Structured logs without bodies, tokens or record IDs (ADM-7, DEP-8) | Done |
 | Graceful shutdown with WAL checkpoint (DEP-7) | Done |
 | Admin CLI: `invite`, `backup`, `restore`, `migrate --status`, `accounts`, `version`, `healthcheck` (DEP-16, DEP-25) | Done |
-| Container image, Compose files (DEP-1…11, DEP-17…19) | Later in P1 |
+| Container image, Compose files (DEP-1…11, DEP-17…19) | Done, in [deploy/](../../deploy/README.md) |
 | Serving the dashboard, security headers (SEC-8) | P3 |
 
 ## Running it
@@ -21,7 +21,7 @@ cp apps/server/.env.example apps/server/.env   # once; local settings for develo
 pnpm --filter @tazamun/server dev             # restarts on changes
 ```
 
-`dev` reads `apps/server/.env` (git-ignored) and stores data in `apps/server/data-local/`. The server runs its TypeScript source directly with Node's type stripping; there is no build step yet. Settings can also come from a JSON file named by `TAZAMUN_CONFIG_FILE`; environment variables override it. Every setting, its file key and the precedence rules are in the [configuration reference](../../docs/guides/server-configuration.md), which is generated from [`src/config.ts`](src/config.ts).
+`dev` reads `apps/server/.env` (git-ignored) and stores data in `apps/server/data-local/`. In development the server runs its TypeScript source directly with Node's type stripping. The container image runs a bundle instead (`pnpm --filter @tazamun/server build`). Settings can also come from a JSON file named by `TAZAMUN_CONFIG_FILE`; environment variables override it. Every setting, its file key and the precedence rules are in the [configuration reference](../../docs/guides/server-configuration.md), which is generated from [`src/config.ts`](src/config.ts).
 
 `node src/main.ts` is the production entry point. Run node directly, not through `pnpm start`, so `SIGTERM` reaches the server and it can shut down cleanly.
 
@@ -64,6 +64,7 @@ Run from the repository root:
 | ------- | ------------ |
 | `pnpm --filter @tazamun/server dev` | Start the server with `.env`, restarting on changes |
 | `pnpm --filter @tazamun/server tazamun <command>` | Run an admin command with `.env` |
+| `pnpm --filter @tazamun/server build` | Bundle into `dist/main.js` with `dist/THIRD-PARTY-LICENSES.txt`, as the image runs it |
 | `pnpm --filter @tazamun/server typecheck` | Type-check this package |
 | `pnpm --filter @tazamun/server config:docs` | Regenerate [`docs/guides/server-configuration.md`](../../docs/guides/server-configuration.md). A test fails if it's out of date. |
 | `pnpm test --project server` | Run this package's tests |
@@ -76,6 +77,8 @@ Run from the repository root:
 | `@hono/node-server` | Runs the Hono app on Node's `http` server |
 | `zod` | Validating configuration and request bodies, with the schemas from `@tazamun/core` |
 | `@tazamun/core` | Shared wire schemas and constants |
+
+Development only: `esbuild`, which bundles the server for the image. Its install script is denied in `pnpm-workspace.yaml` (`allowBuilds`); the platform binary comes as an optional dependency.
 
 SQLite comes from Node itself (`node:sqlite`), so the server has no native modules.
 
@@ -107,6 +110,7 @@ src/
 test/
   harness.ts         in-memory app with a fake clock and captured logs
 .env.example         development settings
+build.ts             production bundle and third-party license file (dist/)
 ```
 
 Unit tests live next to the code as `*.test.ts`. `app.test.ts` exercises the whole API in-process.

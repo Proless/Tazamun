@@ -10,8 +10,8 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 
 ## Current status
 
-- **Phase:** P1 (engine, server, accounts, tabs). P0's exit criteria are met: workspace, tooling and CI are set up, and `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Q1 is decided: Hono and `node:sqlite`. The one open P0 item, Dependabot for Docker base images, lands with the Dockerfile in P1.
-- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `scripts/`, `docs/`, `.github/`. Next: the container image and Compose files.
+- **Phase:** P1 (engine, server, accounts, tabs). P0's exit criteria are met: workspace, tooling and CI are set up, and `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Q1 is decided: Hono and `node:sqlite`.
+- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `deploy/` (Dockerfile, Compose files, proxy examples; see [deploy/README.md](deploy/README.md)), `scripts/`, `docs/`, `.github/`. Next: the CI image pipeline (build, smoke test, scan, publish `edge`).
 - The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
@@ -54,15 +54,15 @@ packages/
   core/              HLC, schemas (zod), crypto; merge functions and API client from P1; no browser APIs
   ui/                (planned) shared Vue 3 components
 data/                (planned, P5) extension-equivalents.json
-deploy/              (planned, P1)
-  docker/            Dockerfile (multi-stage), .dockerignore
+deploy/              see deploy/README.md
+  docker/            Dockerfile (multi-stage), Dockerfile.dockerignore
   compose/           docker-compose.yml, docker-compose.caddy.yml, .env.example
   proxy/             Caddy / Traefik / nginx examples
-  k8s/               example manifests (one replica + PVC)
+  k8s/               (planned, P6) example manifests (one replica + PVC)
 docs/
   srs/               requirements (sections 1–6)
   adr/               architecture decision records (0001–0008)
-  guides/            server-configuration.md (generated); user, self-hosting and contributor docs follow in P1
+  guides/            self-hosting.md, server-configuration.md (generated); user and contributor docs follow
 scripts/             repository maintenance scripts (license check)
 .github/
   workflows/ci.yml   lint, type-check, Node tests, browser tests, dependency audit, license check
@@ -95,7 +95,9 @@ Commands (Node 26, pnpm 12; install pnpm with `npm install -g pnpm`, since Node 
 | `pnpm --filter @tazamun/server dev` | Run the server locally (copy `apps/server/.env.example` to `.env` first) |
 | `pnpm --filter @tazamun/server tazamun <command>` | Admin commands: invites, backup, restore, accounts ([apps/server/README.md](apps/server/README.md#admin-commands)) |
 
-Still to come: `pnpm --filter extension dev`, `docker compose up`.
+| `docker build -f deploy/docker/Dockerfile -t tazamun:test .` | Build the server image locally, for testing ([deploy/README.md](deploy/README.md)) |
+
+Still to come: `pnpm --filter extension dev`.
 
 ---
 
@@ -107,7 +109,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 
 - [x] Set up the pnpm workspace with the layout above. TypeScript strict mode, ESLint and Prettier, Vitest.
 - [x] GitHub Actions: lint, type-check, tests, dependency audit, license check on every PR.
-- [ ] Renovate or Dependabot configured for npm, GitHub Actions and Docker base-image digests (DEP-37). *(npm and Actions done; add Docker when the Dockerfile lands.)*
+- [x] Renovate or Dependabot configured for npm, GitHub Actions and Docker base-image digests (DEP-37).
 - [x] `packages/core/crypto`: Argon2id (WASM), HKDF, AES-GCM wrap and unwrap, payload encrypt and decrypt with AAD. **Test vectors** committed. *(Library choice and format details: [ADR-0008](docs/adr/0008-crypto-implementation.md).)*
 - [x] `packages/core/hlc`: HLC with tests (monotonic, clock skew, comparison including device ID).
 - [x] `packages/core/schema`: record envelope plus a payload schema per collection (zod), with schema versions. *(`bookmarks` follows in P4 and `devices` after Q2.)*
@@ -121,8 +123,8 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 - [x] **Server:** accounts, prelogin, sessions, devices, collections (pull and push), `/v1/info`, `/v1/health`, quotas, rate limits, registration modes and invite CLI, migrations (ADM-1…4, ADM-7).
 - [x] **Server config:** one validated schema for `TAZAMUN_*` variables, `*_FILE` secrets, the `TAZAMUN_PUBLIC_URL` HTTPS check, a config reference generated from the schema (DEP-12…15).
 - [x] **Admin CLI:** `invite`, `backup`, `restore`, `migrate --status`, `accounts`, `version`, `healthcheck` (DEP-16). Automatic backup before migrating (DEP-24, DEP-25).
-- [ ] **Container image:** multi-stage Dockerfile, non-root UID 10001, read-only root filesystem, `/data` volume, `HEALTHCHECK`, correct signal handling, JSON logs, OCI labels, instance secret generated on first start (DEP-1…11).
-- [ ] **Compose files:** `docker-compose.yml` and `docker-compose.caddy.yml` with `.env.example` and resource limits. Reverse-proxy docs for Caddy, Traefik and nginx. Warning about local storage and a single instance (DEP-17…19, DEP-22).
+- [x] **Container image:** multi-stage Dockerfile, non-root UID 10001, read-only root filesystem, `/data` volume, `HEALTHCHECK`, correct signal handling, JSON logs, OCI labels, instance secret generated on first start (DEP-1…11).
+- [x] **Compose files:** `docker-compose.yml` and `docker-compose.caddy.yml` with `.env.example` and resource limits. Reverse-proxy docs for Caddy, Traefik and nginx. Warning about local storage and a single instance (DEP-17…19, DEP-22).
 - [ ] **CI image pipeline:** build on every PR plus a container smoke test (health, API suite, SIGTERM, restart persistence); vulnerability scan; multi-arch with Buildx; publish `edge` and `sha-*` to GHCR from `main` with minimal token permissions (DEP-28…30, DEP-33, DEP-34, DEP-38).
 - [ ] **Extension scaffold:** WXT with three targets. Fixed Firefox add-on ID. CSP with `'wasm-unsafe-eval'`. Permissions as in SRS 2.7.
 - [ ] **Onboarding:** create or connect an account, recovery kit, device registration (ACC-1…8, ACC-11, UI-2).
@@ -275,6 +277,12 @@ Pitfalls for one app or package live in that folder's `CLAUDE.md`. The sections 
 - Server pitfalls (SQLite, `seq`, Hono, logging, rate limits) are in [apps/server/CLAUDE.md](apps/server/CLAUDE.md).
 
 ### Containers, self-hosting and publishing
+- **The image runs a bundle, not the TypeScript source.** `pnpm deploy` or a production install would copy `@tazamun/core` into `node_modules`, where Node refuses to strip types. `apps/server/build.ts` bundles everything into `dist/main.js` with esbuild instead.
+- **The build stage runs on `$BUILDPLATFORM`.** Its output is plain JavaScript, so arm64 images build without emulation. Only the small runtime `RUN` (user, directories) runs under QEMU. Keep anything heavy out of the runtime stage.
+- **The build context is an allow-list** in `deploy/docker/Dockerfile.dockerignore` (BuildKit reads `<Dockerfile>.dockerignore`). A new file the build needs must be added there.
+- **`ENTRYPOINT` is `tazamun`.** `docker compose exec tazamun tazamun <cmd>` (exec ignores the entrypoint) but `docker compose run --rm tazamun <cmd>` (run uses it). Mixing them up gives `Unknown command "tazamun"`.
+- **`restore` from `docker compose run`** runs in a new container with its own network namespace, so its "is the server running?" check can't see the real server. Always stop the server first.
+- **Git Bash on Windows rewrites container paths** (`/data` → `C:/...`) in `docker` arguments. Set `MSYS_NO_PATHCONV=1`.
 - **Native modules:** the server uses the built-in `node:sqlite` (Q1), so the image needs no native builds. Keep it that way. A native dependency must be built in the same base image family (glibc vs musl) and architecture as the runtime stage, or its binaries won't load.
 - **arm64 under QEMU** is very slow, and native compiles can time out. Prefer native arm64 runners, and cache dependency layers.
 - **PID 1 and signals:** `CMD ["npm", "start"]` doesn't forward `SIGTERM` properly. Run `node` directly (or use a minimal init), or `docker stop` will kill the server without checkpointing the WAL.

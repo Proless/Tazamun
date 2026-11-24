@@ -56,5 +56,7 @@ Read this before changing anything in `apps/server`. The repository-wide rules i
 - Node runs the TypeScript source directly (type stripping), including `@tazamun/core` through the workspace link. This works because pnpm's symlink resolves to `packages/core`, outside `node_modules`; Node refuses to strip types from files under `node_modules`. Don't enable `--preserve-symlinks`.
 - `erasableSyntaxOnly` forbids constructor parameter properties and enums. Declare fields explicitly.
 - `@tazamun/core` exports namespaces only: `import { schema, crypto as tzCrypto } from '@tazamun/core'`, then `schema.pushRequest`. Don't import the core `crypto` namespace as `crypto`; it would hide `node:crypto` and Web Crypto names in that file.
-- Graceful shutdown on `SIGTERM` can't be tested on Windows, where a kill is always forced. The container smoke test (DEP-29) covers it on Linux.
+- Graceful shutdown on `SIGTERM` can't be tested on Windows, where a kill is always forced. Test it in the container (`docker stop` should exit 0 within about a second); the CI smoke test (DEP-29) will cover it.
+- **The image runs `dist/main.js`, built by `build.ts` with esbuild.** Code must bundle: no dynamic `import()` of computed paths, no reading files relative to the source at run time (`config-docs.ts` is a dev script and isn't bundled). `version.ts` imports `package.json` with an import attribute, which esbuild inlines.
+- A new runtime dependency ends up in the bundle. `build.ts` fails if a bundled package has no license file, so the license notice always ships in `THIRD-PARTY-LICENSES.txt`.
 - Tests use `Database.open(':memory:')` and `app.request()`; no port, no files. Tests that need files (migrations, backups) use a temporary directory and remove it afterwards.

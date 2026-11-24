@@ -24,7 +24,7 @@ Details: [architecture](<docs/srs/2. Overall Description.md#22-architecture>), [
 | `apps/extension` | Browser extension for Chrome, Edge and Firefox (planned, P1) |
 | [apps/server](apps/server/README.md) | Sync server: HTTP API, accounts, encrypted record storage. Built on Hono and `node:sqlite`. Serves the dashboard from P3. |
 | `apps/dashboard` | Web dashboard (planned, P3) |
-| `deploy/` | Docker image, Compose files, reverse-proxy examples (planned, P1) |
+| [deploy](deploy/README.md) | Docker image, Compose files, reverse-proxy examples. To run a server: [self-hosting guide](docs/guides/self-hosting.md). |
 | [docs](docs/README.md) | Requirements (SRS) and architecture decisions (ADRs) |
 | [scripts](scripts/README.md) | Repository maintenance scripts (license check) |
 
