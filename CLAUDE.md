@@ -64,6 +64,13 @@ scripts/             repository maintenance scripts
 
 Each app and package has the same shape: `src/` for code, unit tests next to it as `*.test.ts`, shared fixtures and test vectors in `test/`, plus its own `package.json`, `tsconfig.json` and `vitest.config.ts`. Root config (`tsconfig.base.json`, `eslint.config.js`, `vitest.config.ts`, `.prettierrc.json`) applies to all of them. Create a folder only when it gets real content.
 
+**Documentation lives next to the code.** Every app and package has:
+
+- `README.md` for people: what it is, how to use it, its scripts and layout.
+- `CLAUDE.md` for working in that folder: its rules and pitfalls. Claude Code loads it automatically when working there.
+
+This root file keeps only what spans the repository: rules, layout, roadmap, known gaps and cross-cutting pitfalls. Don't copy a package's details into it; link to the package instead.
+
 Image: `ghcr.io/proless/tazamun` (`edge` from `main`; `X.Y.Z`, `X.Y`, `X`, `latest` from tags).
 
 Commands (Node 26, pnpm 12; install pnpm with `npm install -g pnpm`, since Node 25+ no longer ships corepack):
@@ -197,11 +204,12 @@ From [SRS 6.5](<docs/srs/6. Other Requirements.md#65-known-limitations-and-open-
 
 ## Pitfalls (read before working in each area)
 
+Pitfalls for one app or package live in that folder's `CLAUDE.md`. The sections below cover areas that span several folders, or whose folder doesn't exist yet. When you create an app, move its section into the new `CLAUDE.md`.
+
 ### Tooling
 - **typescript-eslint supports TypeScript only below 6.1.** TypeScript 7 (the native port) is out, but stay on `typescript ~6.0` until typescript-eslint supports it.
 - Node 25+ no longer bundles corepack, so `packageManager` in `package.json` isn't enforced automatically. CI uses `pnpm/action-setup`, which reads it.
 - Vitest 5: `passWithNoTests` is a root-only option; per-project configs (`defineProject`) reject it.
-- Property tests (fast-check) over wide ranges almost never produce equal values. To exercise tie-breaks, also run them with small domains (see `collidingHlcArb` in the HLC tests).
 - Workspace packages export their TypeScript source (`"exports": "./src/index.ts"`). Bundlers and Vitest handle this directly, and the base tsconfig uses `erasableSyntaxOnly`, so Node 26 can run the source with built-in type stripping. Revisit if a package is ever published to npm.
 
 ### MV3 and extension lifecycle
@@ -226,9 +234,7 @@ From [SRS 6.5](<docs/srs/6. Other Requirements.md#65-known-limitations-and-open-
 - **Echo loops:** applying a remote change fires a local event, which looks like a new change, which gets pushed… Always suppress echoes and verify the post-apply diff is empty.
 - **Events are not truth:** events are lost while the extension is asleep or the browser is closed, and vendor sync can change bookmarks behind your back. Diff against the mirror.
 - Save the last `seq` only **after** applying the batch, or a crash will skip records forever.
-- Clock skew affects HLC ordering. Warn when the local clock differs from the server's `Date` header by more than 5 minutes.
-- `hlc.receive` throws `HlcDriftError` for a remote stamp more than 24 h in the future. The engine must catch it, keep its own clock unchanged, still apply the record, and show a warning. Never adopt the remote time, or one broken clock drags every device into the future.
-- The serialized HLC format (SRS 4.4) is stored in every record. Changing it needs a migration, like the URL normalization rules.
+- HLC pitfalls (clock skew, `HlcDriftError`, the stored format) are in [packages/core/CLAUDE.md](packages/core/CLAUDE.md#hlc).
 - Tombstones expire after 90 days, so a device offline longer than that must do a full reconcile, not an incremental pull.
 - Don't put the merge in the server "for performance". See rule 1.
 
@@ -246,10 +252,8 @@ From [SRS 6.5](<docs/srs/6. Other Requirements.md#65-known-limitations-and-open-
 - Enterprise-managed bookmarks are read-only; skip them.
 
 ### Crypto and security
-- Never reuse a nonce: a fresh random 96-bit nonce for every encryption, including re-pushes of the same record.
-- Always bind AAD (`accountId | collection | recordId`) and **check it on decrypt**, or a malicious server can swap records.
+- Pitfalls for the crypto code itself (nonces, AAD, primitives, test vectors) are in [packages/core/CLAUDE.md](packages/core/CLAUDE.md#crypto).
 - Compare hashes in constant time on the server. Rate-limit sign-in.
-- Don't build your own crypto primitives. Use Web Crypto plus one audited Argon2 WASM library.
 - The dashboard is served by the server, so a compromised server compromises the dashboard. Don't market the dashboard as "zero-trust".
 
 ### Server and operations
@@ -279,6 +283,7 @@ From [SRS 6.5](<docs/srs/6. Other Requirements.md#65-known-limitations-and-open-
 
 - Before implementing a feature, read its SRS section and the ADRs it references. Requirements tell you **what**; ADRs tell you **why**.
 - Keep the phase checklists above up to date: tick a step when it's merged, and update **Current status** when a phase's exit criteria are met.
-- Put new pitfalls in the matching section above as you find them. That's what this file is for.
+- Put new pitfalls where they belong as you find them: in the folder's own `CLAUDE.md` if they concern one app or package, otherwise in the matching section above.
+- When you add or change an app or package, update its `README.md` and `CLAUDE.md` in the same PR.
 - When a requirement turns out to be wrong or impossible, update the SRS in the same PR and explain why in the PR description. Use a new ADR if the change contradicts an existing one.
 - Prefer pure functions in `packages/core` with tests over logic inside browser event handlers.
