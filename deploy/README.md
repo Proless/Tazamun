@@ -32,3 +32,19 @@ With `localhost`, Caddy uses its own local certificate authority, hence `-k`. On
 - **`ENTRYPOINT ["tazamun"]`, `CMD ["serve"]`:** `docker run <image> invite list` runs an admin command. Node is PID 1 and handles SIGTERM itself (DEP-7).
 - **`HEALTHCHECK`** runs `tazamun healthcheck`; there's no curl in the image.
 - **OCI labels** take `VERSION`, `REVISION` and `CREATED` from build arguments, which CI sets.
+
+## CI pipeline
+
+[`.github/workflows/image.yml`](../.github/workflows/image.yml) runs on every pull request and every push to `main`:
+
+1. Builds the image for **amd64** and for **arm64** (under QEMU; only the runtime stage is emulated), each loaded into the runner's Docker.
+2. Runs the **smoke test** on both (DEP-29): [`apps/server/test/smoke.ts`](../apps/server/test/smoke.ts) starts the container with a fresh volume and the Compose hardening, waits for `healthy`, creates an invite with the CLI, signs up and signs in two devices with real client crypto, pushes, pulls and decrypts, revokes a device, stops with SIGTERM (must exit 0), restarts, and checks the data is still there.
+3. **Scans** the amd64 image with Grype (DEP-34). The job summary shows the findings by severity; fixable Critical findings are warnings. The release workflow (P6) will fail on them. SARIF goes to code scanning once the repository is public.
+4. On `main` only: builds both architectures and **publishes** `ghcr.io/proless/tazamun:edge` and `:sha-<7 chars>` (DEP-30), with version `<server version>-edge.<sha>`. That job alone has `packages: write` (DEP-38). It then starts the published image on both architectures.
+
+Run the smoke test locally against any image:
+
+```sh
+docker build -f deploy/docker/Dockerfile -t tazamun:test .
+pnpm --filter @tazamun/server smoke tazamun:test
+```

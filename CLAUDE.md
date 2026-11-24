@@ -11,7 +11,7 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 ## Current status
 
 - **Phase:** P1 (engine, server, accounts, tabs). P0's exit criteria are met: workspace, tooling and CI are set up, and `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Q1 is decided: Hono and `node:sqlite`.
-- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `deploy/` (Dockerfile, Compose files, proxy examples; see [deploy/README.md](deploy/README.md)), `scripts/`, `docs/`, `.github/`. Next: the CI image pipeline (build, smoke test, scan, publish `edge`).
+- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `deploy/` (Dockerfile, Compose files, proxy examples; see [deploy/README.md](deploy/README.md)), `scripts/`, `docs/`, `.github/`. The image pipeline builds, smoke-tests and scans every PR and publishes `edge` from `main`. Next: the extension scaffold.
 - The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
@@ -66,8 +66,9 @@ docs/
 scripts/             repository maintenance scripts (license check)
 .github/
   workflows/ci.yml   lint, type-check, Node tests, browser tests, dependency audit, license check
-                     (P1 adds image build + smoke test; publish-edge.yml in P1, release.yml in P6)
-  dependabot.yml     npm and GitHub Actions; Docker base images from P1
+  workflows/image.yml  image build for amd64 and arm64, smoke test, scan; publishes edge from main
+                     (release.yml follows in P6)
+  dependabot.yml     npm, GitHub Actions, Docker base image
 ```
 
 Each app and package has the same shape: `src/` for code, unit tests next to it as `*.test.ts`, shared fixtures and test vectors in `test/`, plus its own `package.json`, `tsconfig.json` and `vitest.config.ts`. Root config (`tsconfig.base.json`, `eslint.config.js`, `vitest.config.ts`, `.prettierrc.json`) applies to all of them. Create a folder only when it gets real content.
@@ -96,6 +97,7 @@ Commands (Node 26, pnpm 12; install pnpm with `npm install -g pnpm`, since Node 
 | `pnpm --filter @tazamun/server tazamun <command>` | Admin commands: invites, backup, restore, accounts ([apps/server/README.md](apps/server/README.md#admin-commands)) |
 
 | `docker build -f deploy/docker/Dockerfile -t tazamun:test .` | Build the server image locally, for testing ([deploy/README.md](deploy/README.md)) |
+| `pnpm --filter @tazamun/server smoke tazamun:test` | Container smoke test against a local image (DEP-29) |
 
 Still to come: `pnpm --filter extension dev`.
 
@@ -125,7 +127,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 - [x] **Admin CLI:** `invite`, `backup`, `restore`, `migrate --status`, `accounts`, `version`, `healthcheck` (DEP-16). Automatic backup before migrating (DEP-24, DEP-25).
 - [x] **Container image:** multi-stage Dockerfile, non-root UID 10001, read-only root filesystem, `/data` volume, `HEALTHCHECK`, correct signal handling, JSON logs, OCI labels, instance secret generated on first start (DEP-1…11).
 - [x] **Compose files:** `docker-compose.yml` and `docker-compose.caddy.yml` with `.env.example` and resource limits. Reverse-proxy docs for Caddy, Traefik and nginx. Warning about local storage and a single instance (DEP-17…19, DEP-22).
-- [ ] **CI image pipeline:** build on every PR plus a container smoke test (health, API suite, SIGTERM, restart persistence); vulnerability scan; multi-arch with Buildx; publish `edge` and `sha-*` to GHCR from `main` with minimal token permissions (DEP-28…30, DEP-33, DEP-34, DEP-38).
+- [x] **CI image pipeline:** build on every PR plus a container smoke test (health, API suite, SIGTERM, restart persistence); vulnerability scan; multi-arch with Buildx; publish `edge` and `sha-*` to GHCR from `main` with minimal token permissions (DEP-28…30, DEP-33, DEP-34, DEP-38).
 - [ ] **Extension scaffold:** WXT with three targets. Fixed Firefox add-on ID. CSP with `'wasm-unsafe-eval'`. Permissions as in SRS 2.7.
 - [ ] **Onboarding:** create or connect an account, recovery kit, device registration (ACC-1…8, ACC-11, UI-2).
 - [ ] **Engine:** outbox in IndexedDB, debounced push, alarm and popup-triggered pull, backoff, status, pause, per-module toggles (ENG-1…14).
@@ -292,6 +294,9 @@ Pitfalls for one app or package live in that folder's `CLAUDE.md`. The sections 
 - **Tags:** never move `latest` for a pre-release. Never re-push an existing `X.Y.Z` tag. Users pin to versions, and replacing one silently breaks trust and signatures.
 - **GHCR visibility:** a newly created package on GHCR is private by default. Make it public once, and link it to the repository.
 - **Docker Hub limits:** anonymous pulls are rate-limited. Default the docs to GHCR.
+- **Pin third-party actions by commit SHA**, with the version in a comment (`uses: docker/build-push-action@<sha> # v7.4.0`). Tags can be moved; `trivy-action`'s were hijacked in 2026. Dependabot updates SHA pins. Pick releases at least two weeks old, as `minimumReleaseAge` does for npm.
+- **The repository is private for now.** Code scanning needs GitHub Advanced Security there, so `image.yml` uploads SARIF only when the repository is public. Packages published from a private repository are private too: make `ghcr.io/proless/tazamun` public when the repository goes public, or self-hosters can't pull it.
+- **The smoke test** (`apps/server/test/smoke.ts`) runs on the runner, talks to the container over a random loopback port, and uses `@tazamun/core` like a real client (Argon2id included). Run it locally with `pnpm --filter @tazamun/server smoke <image>`.
 - **Token scope:** don't give the workflow `write-all`. Use `packages: write` and `id-token: write` only where needed, and keep the Docker Hub token out of PR workflows from forks.
 - **Reverse proxies:** nginx's default `client_max_body_size` (1 MB) is below the API's 2 MB batch limit, and missing `X-Forwarded-Proto` breaks the public-URL check. Both belong in the proxy examples.
 
