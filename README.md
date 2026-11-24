@@ -26,6 +26,7 @@ Details: [architecture](<docs/srs/2. Overall Description.md#22-architecture>), [
 | `apps/dashboard` | Web dashboard (planned) |
 | `deploy/` | Docker image, Compose files, reverse-proxy examples (planned) |
 | [docs](docs/README.md) | Requirements (SRS) and architecture decisions (ADRs) |
+| [scripts](scripts/README.md) | Repository maintenance scripts (license check) |
 
 Each app and package has its own `README.md` explaining what it is and how to use it.
 
@@ -40,7 +41,7 @@ pnpm lint
 pnpm typecheck
 ```
 
-Reference requirement IDs in commits and pull requests, e.g. `feat(tabs): send tab to device (TAB-7)`.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the rules every change must follow, and how pull requests are reviewed.
 
 ## License
 

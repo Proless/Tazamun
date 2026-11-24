@@ -10,10 +10,11 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "pnpm -r --parallel typecheck",
+    "typecheck": "pnpm -r --parallel typecheck && tsc -p scripts --noEmit",
     "test": "vitest run --project=!*-browser*",
     "test:browser": "vitest run --project=*-browser*",
-    "test:watch": "vitest --project=!*-browser*"
+    "test:watch": "vitest --project=!*-browser*",
+    "licenses:check": "node scripts/check-licenses.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
