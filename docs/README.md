@@ -4,7 +4,7 @@
 | ------ | ------------ |
 | [srs/](srs/) | Software Requirements Specification (revision 2). Every requirement has an ID such as `TAB-7` or `SEC-3`. |
 | [adr/](adr/README.md) | Architecture Decision Records (0001–0008): the hard-to-reverse decisions and why they were made. |
-| `guides/` | User, self-hosting and contributor guides (from P1). |
+| [guides/](guides/) | [Server configuration reference](guides/server-configuration.md) (generated). User, self-hosting and contributor guides follow in P1. |
 
 ## SRS sections
 

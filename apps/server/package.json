@@ -1,0 +1,22 @@
+{
+  "name": "@tazamun/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tazamun sync server: an encrypted record store with accounts and device sessions.",
+  "type": "module",
+  "exports": {
+    ".": "./src/app.ts"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env src/main.ts",
+    "start": "node src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "config:docs": "node src/config-docs.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.11",
+    "@tazamun/core": "workspace:*",
+    "hono": "^4.13.21",
+    "zod": "^4.6.7"
+  }
+}

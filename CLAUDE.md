@@ -11,7 +11,7 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 ## Current status
 
 - **Phase:** P1 (engine, server, accounts, tabs). P0's exit criteria are met: workspace, tooling and CI are set up, and `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Q1 is decided: Hono and `node:sqlite`. The one open P0 item, Dependabot for Docker base images, lands with the Dockerfile in P1.
-- **What exists:** `packages/core`, `scripts/`, `docs/`, `.github/`. No app exists yet; `apps/server` is the next folder to create.
+- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations; see [apps/server/README.md](apps/server/README.md)), `scripts/`, `docs/`, `.github/`. Next: the admin CLI and backups, then the container image.
 - The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
@@ -48,7 +48,7 @@ Folders marked *(planned)* don't exist yet.
 ```text
 apps/
   extension/         (planned, P1) WXT; engine in src/engine/, modules in src/modules/<type>/
-  server/            (planned, P1) Node.js LTS + Hono + node:sqlite; serves the dashboard build
+  server/            Node.js LTS + Hono + node:sqlite: HTTP API, config, migrations; serves the dashboard build from P3
   dashboard/         (planned, P3) Vue 3 + Vite SPA
 packages/
   core/              HLC, schemas (zod), crypto; merge functions and API client from P1; no browser APIs
@@ -62,7 +62,7 @@ deploy/              (planned, P1)
 docs/
   srs/               requirements (sections 1–6)
   adr/               architecture decision records (0001–0008)
-  guides/            (planned, P1) user, self-hosting and contributor docs
+  guides/            server-configuration.md (generated); user, self-hosting and contributor docs follow in P1
 scripts/             repository maintenance scripts (license check)
 .github/
   workflows/ci.yml   lint, type-check, Node tests, browser tests, dependency audit, license check
@@ -92,8 +92,9 @@ Commands (Node 26, pnpm 12; install pnpm with `npm install -g pnpm`, since Node 
 | `pnpm typecheck` | `tsc --noEmit` in every package and in `scripts/` |
 | `pnpm format` / `pnpm format:check` | Prettier write / check |
 | `pnpm licenses:check` | Dependency license policy ([scripts/README.md](scripts/README.md)) |
+| `pnpm --filter @tazamun/server dev` | Run the server locally (copy `apps/server/.env.example` to `.env` first) |
 
-Still to come: `pnpm --filter extension dev`, `pnpm --filter server dev`, `docker compose up`.
+Still to come: `pnpm --filter extension dev`, `docker compose up`.
 
 ---
 
@@ -116,9 +117,9 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 
 ### P1: Engine, server, accounts, tabs (4–6 weeks): first usable version
 
-- [ ] **Server:** accounts, prelogin, sessions, devices, collections (pull and push), `/v1/info`, `/v1/health`, quotas, rate limits, registration modes and invite CLI, migrations (ADM-1…4, ADM-7).
-- [ ] **Server config:** one validated schema for `TAZAMUN_*` variables, `*_FILE` secrets, the `TAZAMUN_PUBLIC_URL` HTTPS check, a config reference generated from the schema (DEP-12…15).
-- [ ] **Admin CLI:** `invite`, `backup`, `restore`, `migrate --status`, `accounts`, `version`, `healthcheck` (DEP-16). Automatic backup before migrating (DEP-24, DEP-25).
+- [ ] **Server:** accounts, prelogin, sessions, devices, collections (pull and push), `/v1/info`, `/v1/health`, quotas, rate limits, registration modes and invite CLI, migrations (ADM-1…4, ADM-7). *(All done except the invite CLI, which comes with the admin CLI.)*
+- [x] **Server config:** one validated schema for `TAZAMUN_*` variables, `*_FILE` secrets, the `TAZAMUN_PUBLIC_URL` HTTPS check, a config reference generated from the schema (DEP-12…15).
+- [ ] **Admin CLI:** `invite`, `backup`, `restore`, `migrate --status`, `accounts`, `version`, `healthcheck` (DEP-16). Automatic backup before migrating (DEP-24, DEP-25). *(The pre-migration backup and the online backup function are done.)*
 - [ ] **Container image:** multi-stage Dockerfile, non-root UID 10001, read-only root filesystem, `/data` volume, `HEALTHCHECK`, correct signal handling, JSON logs, OCI labels, instance secret generated on first start (DEP-1…11).
 - [ ] **Compose files:** `docker-compose.yml` and `docker-compose.caddy.yml` with `.env.example` and resource limits. Reverse-proxy docs for Caddy, Traefik and nginx. Warning about local storage and a single instance (DEP-17…19, DEP-22).
 - [ ] **CI image pipeline:** build on every PR plus a container smoke test (health, API suite, SIGTERM, restart persistence); vulnerability scan; multi-arch with Buildx; publish `edge` and `sha-*` to GHCR from `main` with minimal token permissions (DEP-28…30, DEP-33, DEP-34, DEP-38).
@@ -221,6 +222,7 @@ Pitfalls for one app or package live in that folder's `CLAUDE.md`. The sections 
 - Scripts that call pnpm from Node must use `process.env.npm_execpath`. It can be a JS file (run it with `node`) or a native binary (run it directly); spawning `pnpm` by name fails on Windows, where it's `pnpm.cmd`.
 - Node 25+ no longer bundles corepack, so `packageManager` in `package.json` isn't enforced automatically. CI uses `pnpm/action-setup`, which reads it.
 - Vitest 5: `passWithNoTests` is a root-only option; per-project configs (`defineProject`) reject it.
+- `erasableSyntaxOnly` (base tsconfig) forbids constructor parameter properties (`constructor(readonly x: T)`) and enums, because Node's type stripping can't run them. Declare fields explicitly.
 - Workspace packages export their TypeScript source (`"exports": "./src/index.ts"`). Bundlers and Vitest handle this directly, and the base tsconfig uses `erasableSyntaxOnly`, so Node 26 can run the source with built-in type stripping. Revisit if a package is ever published to npm.
 
 ### MV3 and extension lifecycle
@@ -269,11 +271,7 @@ Pitfalls for one app or package live in that folder's `CLAUDE.md`. The sections 
 - The dashboard is served by the server, so a compromised server compromises the dashboard. Don't market the dashboard as "zero-trust".
 
 ### Server and operations
-- SQLite: enable WAL mode, use one writer connection, and make every batch insert a transaction. Back up online with `VACUUM INTO` or the backup API, never by copying the file while it's in use.
-- Assign `seq` inside the write transaction so it never has gaps or duplicates.
-- Never log request bodies. History record IDs in logs reveal browsing patterns over time.
-- **`node:sqlite` is a release candidate in Node 26.** Keep all SQLite calls in one database module in `apps/server`, so an API change (or a switch to `better-sqlite3`) touches one place ([ADR-0004](docs/adr/0004-typescript-monorepo-stack.md)).
-- Hono has no logger. Write one small structured JSON logger for the server, with no way to log bodies, tokens or record IDs from the history collection (ADM-7).
+- Server pitfalls (SQLite, `seq`, Hono, logging, rate limits) are in [apps/server/CLAUDE.md](apps/server/CLAUDE.md).
 
 ### Containers, self-hosting and publishing
 - **Native modules:** the server uses the built-in `node:sqlite` (Q1), so the image needs no native builds. Keep it that way. A native dependency must be built in the same base image family (glibc vs musl) and architecture as the runtime stage, or its binaries won't load.

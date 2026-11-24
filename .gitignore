@@ -64,7 +64,7 @@ pnpm-debug.log*
 *.db-shm
 *.sqlite
 *.sqlite3
-/data-local/
+data-local/
 /backups/
 # Note: the top-level data/ folder holds committed community data (extension-equivalents.json),
 # so only database files inside it are ignored.
