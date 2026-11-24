@@ -28,7 +28,7 @@ scripts/             repository maintenance scripts
 
 Every app and package follows the same shape: `src/` for code, unit tests next to the code as `*.test.ts`, shared fixtures and test vectors in `test/`, and its own `package.json`, `tsconfig.json` and `vitest.config.ts`. A single top-level `src/` was considered and rejected: the extension, server and dashboard are built, versioned and shipped separately, and `packages/core` must stay free of browser and server dependencies, which separate packages enforce.
 
-- Server: Node.js LTS, Hono or Fastify, SQLite (`better-sqlite3`, or `node:sqlite` once stable). One container with a `/data` volume.
+- Server: Node.js LTS, Hono, SQLite through the built-in `node:sqlite` (see *Q1 resolved* below). One container with a `/data` volume.
 - Vue 3 stays from revision 1, now for the extension UIs as well as the dashboard.
 - Tooling: TypeScript strict mode, Vitest, Playwright, ESLint and Prettier, GitHub Actions.
 
@@ -38,3 +38,22 @@ Every app and package follows the same shape: `src/` for code, unit tests next t
 - Schemas and merge code are written once and shared by the extension, dashboard and tests.
 - Self-hosting is one container with no database server.
 - If someone strongly wants a .NET (or Go, or Rust) server later, it's feasible: the server only implements the HTTP API in SRS [section 4.4](<../srs/4. External Interface Requirements.md#44-communications-interfaces>), which has no data-type logic. It would be a second implementation, not a replacement.
+
+## Q1 resolved: Hono and `node:sqlite` (2026-11-24)
+
+Open question Q1 (SRS 6.5) asked which HTTP framework and SQLite driver the server uses.
+
+**Decision:** **Hono** (with `@hono/node-server`) and the built-in **`node:sqlite`** module.
+
+Why Hono over Fastify:
+
+- No dependencies (Fastify 5.12 has 15 direct ones). SEC-7 asks for few, audited dependencies, and the server's job is small: an authenticated record store with no data logic (ADR-0002).
+- It's built on web-standard `Request` and `Response`. Route tests call `app.request()` in-process, with no network port.
+- Validation reuses the zod schemas from `packages/core`.
+- Cost: no built-in logger. The server adds a small structured JSON logger of its own, which must never log bodies or history record IDs (ADM-7).
+
+Why `node:sqlite` over `better-sqlite3`:
+
+- It's part of Node: no native module to compile for each architecture and C library, so the multi-arch image (ADR-0007) needs no native build step and no matching base images.
+- In Node 26 it is "Stability 1.2 – Release candidate" and prints no warning. A local check on Node 26.13 confirmed everything the server needs: WAL mode, `BEGIN IMMEDIATE` transactions (50,000 inserts in about 0.25 s), the online `backup()` API and `VACUUM INTO`.
+- Cost: an RC API can still change. All SQLite access goes through one small database module in `apps/server`, so a change, or a switch to `better-sqlite3` (whose synchronous API is very similar), touches one place.
