@@ -115,8 +115,8 @@ export type DeleteAccountRequest = z.infer<typeof deleteAccountRequest>;
 // ---- Devices and sessions --------------------------------------------------------------------
 
 /**
- * A device's user-editable name (ACC-7). Plaintext for now; if Q2 decides to encrypt names, this
- * holds ciphertext instead, hence the generous limit.
+ * A device's user-editable name (ACC-7). Plaintext, readable by the server (ADR-0009). The
+ * generous limit leaves room for ciphertext if a later ADR encrypts names.
  */
 export const deviceName = z.string().trim().min(1).max(256);
 
