@@ -1,0 +1,50 @@
+# CLAUDE.md: apps/extension
+
+Read this before changing anything in `apps/extension`. The repository-wide rules in the [root CLAUDE.md](../../CLAUDE.md) still apply (especially rules 2, 4, 5 and 7); usage and layout are in [README.md](README.md).
+
+## Rules for this app
+
+1. **The manifest is `src/manifest.ts`**, a pure function per browser with tests. Never edit permissions, the CSP or the Firefox settings anywhere else, and update `manifest.test.ts` with every change. Adding a **required** permission makes Chrome disable the extension for existing users until they accept it: prefer optional permissions requested when the user turns a feature on.
+2. **The CSP allows `'wasm-unsafe-eval'` and nothing else** (SRS 2.7). No `'unsafe-eval'`, no `'unsafe-inline'`, no remote sources, no remotely hosted code. A test enforces it.
+3. **Never change `FIREFOX_ADDON_ID`** once the extension is on AMO. Every version, review and user is tied to it.
+4. **Explicit imports, no auto-imports** (`imports: false` in `wxt.config.ts`): `import { browser } from 'wxt/browser'`, `import { defineBackground } from 'wxt/utils/define-background'`. Every file says where its names come from, and type-aware ESLint can check it.
+5. **Logic lives in `.ts` files, not in `.vue` files.** ESLint doesn't parse `.vue` files yet, and pure functions are unit-tested in Node with the fake browser. Components call into `src/lib/` or later `src/engine/` and `src/modules/<type>/`.
+6. **Pass `browser` in, don't import it in logic.** Functions such as `onInstalled(browser, details)` take the browser as a parameter, so tests pass `wxt/browser` (the fake browser under Vitest) and nothing reaches for globals.
+7. **All UI text comes from `public/_locales/en/messages.json`** through `t()` (SRS 6.3), with a `description` for translators. Layouts use logical CSS properties (`margin-inline`, `padding-block`, `inline-size`), so right-to-left languages need no extra rules. Each page sets `lang` and `dir` through `mountPage`.
+8. **Every entry point calls `startup()` first** (pages through `mountPage`, the background directly), which sets zod to jitless mode before any parse.
+9. **Never capture private or incognito browsing** (rule 7), and never log URLs, titles, keys or tokens (rule 5), not even in development builds.
+
+## Pitfalls
+
+### WXT
+- The public folder is `apps/extension/public/` (next to `package.json`), not `src/public/`, even with `srcDir: 'src'`. Files in the wrong place are silently left out of the build. Without `_locales` the extension doesn't load at all, which `web-ext lint` reports as `NO_MESSAGES_FILE`.
+- `wxt prepare` generates `.wxt/` (tsconfig, types, the `_locales` key types). It runs on `pnpm install` (postinstall) and before `typecheck`. After adding a message, rerun it, or `t('newKey')` is a type error.
+- WXT copies the popup's `<title>` into `action.default_title` (the toolbar tooltip), so the popup's `<title>` is `__MSG_extName__`. A `manifest.default_title` meta tag is ignored.
+- The tsconfig extends the repository base **and** `.wxt/tsconfig.json`; WXT's settings (bundler resolution, DOM lib) win where they overlap.
+- `fakeBrowser.reset()` leaves one blank tab open. Compare against the tabs that existed before, as `install.test.ts` does.
+
+### MV3 and extension lifecycle
+- The Chrome service worker is **killed after about 30 s idle**; Firefox uses an event page (WXT builds `background.scripts` for Firefox and `background.service_worker` for Chromium). Any state in a module-level variable can vanish. Persist to IndexedDB or `storage`, and design every step to be resumable and idempotent.
+- `setTimeout`/`setInterval` don't survive suspension. Use `browser.alarms` (Chrome minimum 30 s; Tazamun's default is 60 s).
+- Register event listeners **synchronously at top level** of the background script, or events that wake the worker are missed. Await inside the listener, never before `addListener`.
+- No WebSockets or SSE that need to stay open. Polling `/v1/info` is the design ([ADR-0003](../../docs/adr/0003-sync-protocol-records-hlc.md)).
+- `storage.local` is 10 MB without `unlimitedStorage`. Put history and snapshots in IndexedDB.
+- WASM (Argon2id) needs `'wasm-unsafe-eval'` in the CSP; it's there from day one.
+- zod compiles parsers with `new Function` unless `z.config({ jitless: true })` runs first; `startup()` does it. Without it, every parse logs a CSP violation ([packages/core/CLAUDE.md](../../packages/core/CLAUDE.md#schemas)).
+- Argon2id with 64 MiB is slow on purpose (about 0.5–1 s). Run it only at sign-in and unlock, never per sync.
+
+### Cross-browser differences
+- `browser.*` (promise-based) vs `chrome.*`: use WXT's `browser` everywhere.
+- Different bookmark root IDs; roots are read-only; Chromium has no separators; Edge calls bookmarks "Favorites". See BMK-3.
+- Firefox refuses `tabs.create` for privileged URLs (`about:config` and others) and restricts `file:`. Fall back to copying the URL (TAB-8).
+- Firefox's `management.getAll()` returns add-on IDs, not store slugs.
+- Chrome's `history.addUrl` can't set title or time. That's one reason history isn't written back ([ADR-0005](../../docs/adr/0005-history-stored-in-extension.md)).
+- The manifest asks for `contextMenus` on all browsers; Firefox accepts it as an alias of `menus`. Tab group APIs differ.
+- Test **every** change on Firefox too. The Chromium end-to-end setup is easier to automate, so Firefox regressions slip through.
+
+### Store publishing
+- AMO requires source code and build instructions for bundled code. Keep builds reproducible from the start (lockfile, `pnpm --filter @tazamun/extension build`).
+- **Firefox data-collection consent:** new add-ons must declare `data_collection_permissions` (Firefox 140+, hence `strict_min_version: 140.0`). Sending data to the user's own server counts as collection even though it is encrypted, so tabs and history are declared as `browsingActivity`. Re-check the categories against Mozilla's policy before every AMO submission. `web-ext lint` warns that Firefox for Android can't use the key; the extension is desktop-only.
+- `web-ext lint` warns about an `innerHTML` assignment inside Vue's runtime. That's Vue's own code, not ours; reviewers know it. Never write `innerHTML` (or `v-html`) in our code.
+- Store reviewers will question `history`, `tabs`, `management` and `bookmarks`. Keep the justifications ready (the comments in `src/manifest.ts` are the start), and request host permission only for the user's server URL.
+- Extension updates reach users over days. The server must stay compatible with at least the previous client version (`minClientVersion`).

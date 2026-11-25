@@ -43,6 +43,21 @@ jobs:
       - run: pnpm --filter @tazamun/core exec playwright install --with-deps chromium firefox
       - run: pnpm test:browser
 
+  extension:
+    name: Extension builds (Chrome, Edge, Firefox)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tazamun/extension build
+      # Mozilla's own checks, as AMO runs them on upload (errors fail; warnings are listed).
+      - run: pnpm --filter @tazamun/extension lint:firefox
+
   audit:
     name: Dependency audit
     runs-on: ubuntu-latest

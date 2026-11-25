@@ -1,0 +1,42 @@
+{
+  "extName": {
+    "message": "Tazamun",
+    "description": "Extension name, shown in the browser and in stores."
+  },
+  "extDescription": {
+    "message": "Sync tabs, history, bookmarks and extensions across Chrome, Edge and Firefox. End-to-end encrypted, self-hostable.",
+    "description": "Extension description, shown in the browser and in stores. At most 132 characters (Chrome Web Store)."
+  },
+  "popupTitle": {
+    "message": "Tazamun",
+    "description": "Title of the toolbar popup."
+  },
+  "popupNotConnected": {
+    "message": "This browser isn't connected to a Tazamun account yet.",
+    "description": "Popup text before the user has set up an account."
+  },
+  "popupSetUp": {
+    "message": "Set up Tazamun",
+    "description": "Popup button that opens the onboarding page."
+  },
+  "optionsTitle": {
+    "message": "Tazamun settings",
+    "description": "Title of the options page."
+  },
+  "optionsPlaceholder": {
+    "message": "Settings for your account, devices and synced data will appear here.",
+    "description": "Options page text while it has no settings yet."
+  },
+  "onboardingTitle": {
+    "message": "Welcome to Tazamun",
+    "description": "Title of the page that opens after installing."
+  },
+  "onboardingLead": {
+    "message": "Tazamun keeps your tabs, history, bookmarks and extension list in sync across Chrome, Edge and Firefox. Everything is encrypted on your devices before it leaves them; the server only ever sees ciphertext.",
+    "description": "First paragraph on the welcome page."
+  },
+  "onboardingNext": {
+    "message": "Creating or connecting an account is coming in the next version.",
+    "description": "Welcome page note while account setup isn't built yet."
+  }
+}

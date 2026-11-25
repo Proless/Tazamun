@@ -5,8 +5,9 @@
  * - Production dependencies end up in the extension, the dashboard or the container image, which
  *   are distributed under MIT. They must use a permissive license.
  * - Development dependencies (build, lint, test) are never distributed. They may also use
- *   MPL-2.0, whose copyleft applies only to the MPL files themselves.
+ *   MPL-2.0, whose copyleft applies only to the MPL files themselves, and Python-2.0.
  * - Anything else, including unknown licenses, fails. Add an exception below only with a reason.
+ *   Exceptions apply to development dependencies only.
  *
  * Run with `pnpm licenses:check`. Node runs this TypeScript file directly (type stripping).
  */
@@ -22,11 +23,15 @@ const PERMISSIVE = new Set([
   'ISC',
   'MIT',
   'Unlicense',
+  'Zlib',
 ]);
-const DEV_ONLY = new Set(['MPL-2.0']);
+const DEV_ONLY = new Set(['MPL-2.0', 'Python-2.0']);
 
 /** Packages allowed despite their license: name → reason. Keep this empty if you can. */
-const EXCEPTIONS: Record<string, string> = {};
+const EXCEPTIONS: Record<string, string> = {
+  // A Windows registry helper pulled in by web-ext (Firefox build checks). Never distributed.
+  winreg: 'package.json says only "BSD" (no version) and the package ships no license file',
+};
 
 interface LicensedPackage {
   name: string;
@@ -69,7 +74,8 @@ function check(report: LicenseReport, allowed: ReadonlySet<string>, scope: strin
   const problems: string[] = [];
   for (const [license, packages] of Object.entries(report)) {
     for (const pkg of packages) {
-      if (!isAllowed(license, allowed) && !(pkg.name in EXCEPTIONS)) {
+      const excepted = scope === 'development' && pkg.name in EXCEPTIONS;
+      if (!isAllowed(license, allowed) && !excepted) {
         problems.push(`${scope}: ${pkg.name}@${pkg.versions.join(',')} has license "${license}"`);
       }
     }
