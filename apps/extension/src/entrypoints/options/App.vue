@@ -11,6 +11,7 @@ import {
   setRememberKey,
   type AccountState,
 } from '../../account/store.ts';
+import { openEngineStore } from '../../engine/idb-store.ts';
 import { t } from '../../lib/i18n.ts';
 import { openOnboarding } from '../../lib/pages.ts';
 import { errorKey, type MessageKey } from '../../onboarding/form.ts';
@@ -63,6 +64,11 @@ async function doSignOut(): Promise<void> {
 async function forget(): Promise<void> {
   if (!window.confirm(t('optionsForgetConfirm'))) return;
   await forgetAccount(browser);
+  // The synced copies of other devices' data, the outbox and the sync state (ACC-11: removed
+  // only now, when the user asks).
+  const store = await openEngineStore();
+  await store.clear();
+  store.close();
   await load();
 }
 

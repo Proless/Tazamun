@@ -32,6 +32,18 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 - Keep the device ID across sign-outs: tabs and extension records use it as their record ID, so a new ID would leave the old records behind as a ghost device.
 - WXT's fake browser doesn't implement `i18n`, `permissions` or `runtime.getPlatformInfo`. Tests that reach them assign a stub (`fakeBrowser.i18n.getMessage = …`) or keep those calls out of the tested function.
 
+### Sync engine
+- **The engine is generic** (rule 2). If a change to `src/engine/` mentions tabs, URLs or any field of `data`, it belongs in a module instead.
+- **One atomic commit per step.** Mirror, outbox and `lastSeq` for a pulled page go into one `store.commit`, after `module.apply`. Saving `lastSeq` earlier skips records forever after a crash; applying after the commit loses them.
+- **Nothing may `await` inside an IndexedDB transaction**; it commits as soon as no request is pending. Encrypt first, then commit. A `put` can also throw synchronously (a value that can't be cloned): `IdbStore.commit` then aborts the transaction, or the other writes would commit alone. A test covers it.
+- **Outbox entries carry a `rev`.** A push confirmation deletes an entry only if `rev` still matches, so a change queued while that record's push was in flight survives.
+- `detectLocalChanges` must return nothing when nothing changed. Re-stamping an unchanged record pushes on every alarm and breaks PERF-5 (one `GET /v1/info` per idle period; a test checks it).
+- A different account or server in the session clears the store first (`meta.owner`). Outbox entries are encrypted for one account and must never reach another.
+- `alarms.create` with an existing name resets that alarm's schedule. Create the poll only if `alarms.get` finds none, or every worker wake-up postpones it.
+- `runtime.onMessage` in Chrome needs `sendResponse` plus `return true`. WXT uses the plain `chrome` API there, without a promise polyfill, so a returned promise doesn't reach the page.
+- The background listens to `storage.onChanged` for `account`, `accountKey` and `settings`. The engine writes only `engineStatus`, so it never triggers itself; keep it that way.
+- Engine tests use `FakeServer` and `FakeTabsModule` from `src/engine/testing.ts`. Module tests should use them too: they speak the real wire format through `@tazamun/core`'s schemas.
+
 ### MV3 and extension lifecycle
 - The Chrome service worker is **killed after about 30 s idle**; Firefox uses an event page (WXT builds `background.scripts` for Firefox and `background.service_worker` for Chromium). Any state in a module-level variable can vanish. Persist to IndexedDB or `storage`, and design every step to be resumable and idempotent.
 - `setTimeout`/`setInterval` don't survive suspension. Use `browser.alarms` (Chrome minimum 30 s; Tazamun's default is 60 s).

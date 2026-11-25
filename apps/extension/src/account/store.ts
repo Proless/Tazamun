@@ -36,6 +36,8 @@ export type ModuleId = (typeof MODULES)[number];
 
 const settings = z.object({
   rememberKey: z.boolean().default(true),
+  /** ENG-12: all sync paused on this device. */
+  paused: z.boolean().default(false),
   modules: z.object({ tabs: z.boolean().default(true) }).prefault({}),
 });
 export type Settings = z.infer<typeof settings>;
@@ -142,10 +144,14 @@ export async function markSignedOut(
   await browser.storage.local.set({ [ACCOUNT_KEY]: signedOut });
 }
 
-/** Remove the account from this browser entirely ("Remove from this browser" after sign-out). */
+/**
+ * Remove the account from this browser entirely ("Remove from this browser" after sign-out). The
+ * engine's synced data in IndexedDB is the caller's to clear (`clearEngineData`), since this module
+ * only owns `storage`.
+ */
 export async function forgetAccount(browser: WxtBrowser): Promise<void> {
   await clearAccountKey(browser);
-  await browser.storage.local.remove(ACCOUNT_KEY);
+  await browser.storage.local.remove([ACCOUNT_KEY, 'engineStatus']);
 }
 
 async function readAccountKey(browser: WxtBrowser): Promise<Uint8Array<ArrayBuffer> | undefined> {

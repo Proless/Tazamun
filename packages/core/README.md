@@ -9,7 +9,7 @@ The shared library of Tazamun: everything that the extension, the dashboard and 
 | `crypto` | Done | Argon2id key derivation, account-key wrapping, HKDF collection keys, AES-GCM payload encryption with AAD, keyed history IDs ([SRS 5.2](<../../docs/srs/5. Other Nonfunctional Requirements.md#52-security-requirements>), [ADR-0008](../../docs/adr/0008-crypto-implementation.md)) |
 | `api` | Done | Typed client for the HTTP API: every response validated with the `schema` bodies, typed `ApiError` (stable code, `retryAfter`) and `NetworkError`; client version check against `minClientVersion` |
 | `account` | Done | Create, connect and unlock flows (ACC-1…3, ACC-7, ACC-8, SEC-5), server URL rules, pairing codes (ACC-6), passphrase length and strength estimate (ACC-4) |
-| merge functions | P1+ | One pure merge function per data type |
+| `merge` | `lastWriterWins` done | Pure merge functions (rule 3, REL-6): whole-record last writer wins by HLC for records owned by one device (tabs, extensions, commands), property-tested for commutativity, associativity and idempotence; `canonicalJson` and `jsonEqual` for change detection. History's union merge (P2) and bookmarks (P4) follow. |
 
 ## Usage
 
@@ -141,6 +141,9 @@ src/
   api/
     client.ts     ApiClient (injected fetch), ApiError, NetworkError
     version.ts    compareVersions, isClientSupported (minClientVersion)
+  merge/
+    lww.ts        lastWriterWins
+    canonical.ts  canonicalJson, jsonEqual
   account/
     flows.ts      createAccount, connectAccount, unlockAccount
     server-url.ts normalizeServerUrl, hostPermissionPattern

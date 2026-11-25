@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@wxt-dev/module-vue": "^1.0.3",
+    "fake-indexeddb": "^6.2.8",
     "vue-tsc": "^3.3.14",
     "web-ext": "^10.8.0",
     "wxt": "^0.21.5"
