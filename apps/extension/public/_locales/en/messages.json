@@ -19,13 +19,161 @@
     "message": "Set up Tazamun",
     "description": "Popup button that opens the onboarding page."
   },
+  "popupConnected": {
+    "message": "Connected to $SERVER$ as “$DEVICE$”.",
+    "description": "Popup status when signed in.",
+    "placeholders": {
+      "server": { "content": "$1", "example": "sync.example.org" },
+      "device": { "content": "$2", "example": "Firefox on Windows" }
+    }
+  },
+  "popupSyncComing": {
+    "message": "Syncing starts in a coming version. Your account and this device are ready.",
+    "description": "Popup note while the sync engine isn't built yet."
+  },
+  "popupLocked": {
+    "message": "Tazamun is locked. Enter your passphrase to unlock it.",
+    "description": "Popup status when the account key isn't remembered and the browser was restarted."
+  },
+  "popupUnlock": {
+    "message": "Unlock",
+    "description": "Popup button that opens the settings page to unlock."
+  },
+  "popupOpenSettings": {
+    "message": "Settings",
+    "description": "Popup button that opens the options page."
+  },
   "optionsTitle": {
     "message": "Tazamun settings",
     "description": "Title of the options page."
   },
-  "optionsPlaceholder": {
-    "message": "Settings for your account, devices and synced data will appear here.",
-    "description": "Options page text while it has no settings yet."
+  "optionsAccount": {
+    "message": "Account",
+    "description": "Heading of the account section on the options page."
+  },
+  "optionsServer": {
+    "message": "Server",
+    "description": "Label for the server URL."
+  },
+  "optionsAccountId": {
+    "message": "Account ID",
+    "description": "Label for the account ID."
+  },
+  "optionsDeviceName": {
+    "message": "This device",
+    "description": "Label for this device's name."
+  },
+  "optionsRememberKey": {
+    "message": "Remember the key on this device",
+    "description": "Checkbox: keep the account key after the browser closes."
+  },
+  "optionsRememberKeyHelp": {
+    "message": "When off, Tazamun asks for your passphrase each time the browser starts. Safer on a shared computer, but less convenient.",
+    "description": "Explanation under the remember-key checkbox."
+  },
+  "optionsSignOut": {
+    "message": "Sign out",
+    "description": "Button: sign this device out. Local data stays."
+  },
+  "optionsSignOutHelp": {
+    "message": "Signing out stops syncing on this browser. Your data on this browser and on the server stays.",
+    "description": "Explanation next to the sign-out button."
+  },
+  "optionsSignedOut": {
+    "message": "You signed out on this browser. Your local data is still here.",
+    "description": "Options page text after the user signed out."
+  },
+  "optionsRevoked": {
+    "message": "This browser was removed from your account on another device, so it stopped syncing. Your local data is still here.",
+    "description": "Options page text after the device was revoked elsewhere."
+  },
+  "optionsSignInAgain": {
+    "message": "Sign in again",
+    "description": "Button: reconnect this browser to the account."
+  },
+  "optionsForget": {
+    "message": "Remove the account from this browser",
+    "description": "Button: forget server URL, account ID and device ID on this browser."
+  },
+  "optionsForgetConfirm": {
+    "message": "Remove the account from this browser? Your data on the server stays, and you can connect again with the recovery kit and your passphrase.",
+    "description": "Confirmation before forgetting the account on this browser."
+  },
+  "optionsNotConnected": {
+    "message": "This browser isn't connected to a Tazamun account.",
+    "description": "Options page text before setup."
+  },
+  "optionsUnlockLead": {
+    "message": "Tazamun is locked because the key isn't remembered on this device. Enter your passphrase to unlock.",
+    "description": "Options page text when locked."
+  },
+  "unlockButton": {
+    "message": "Unlock",
+    "description": "Button that unlocks with the passphrase."
+  },
+  "unlockWrongPassphrase": {
+    "message": "That passphrase doesn't open this account.",
+    "description": "Error after unlocking with a wrong passphrase."
+  },
+  "kitDownload": {
+    "message": "Download recovery kit",
+    "description": "Button: download the recovery kit as a text file."
+  },
+  "kitPrint": {
+    "message": "Print",
+    "description": "Button: print the recovery kit."
+  },
+  "kitCopyPairing": {
+    "message": "Copy pairing code",
+    "description": "Button: copy the pairing code to the clipboard."
+  },
+  "kitCopied": {
+    "message": "Copied.",
+    "description": "Shown after copying the pairing code."
+  },
+  "kitHeading": {
+    "message": "Tazamun recovery kit",
+    "description": "First line of the recovery kit."
+  },
+  "kitServer": {
+    "message": "Server",
+    "description": "Recovery kit label for the server URL."
+  },
+  "kitAccountId": {
+    "message": "Account ID",
+    "description": "Recovery kit label for the account ID."
+  },
+  "kitPairingCode": {
+    "message": "Pairing code",
+    "description": "Recovery kit label for the pairing code."
+  },
+  "kitCreated": {
+    "message": "Created",
+    "description": "Recovery kit label for the date it was made."
+  },
+  "kitPassphraseNotIncluded": {
+    "message": "Your passphrase is not in this kit. Keep it somewhere safe, separately.",
+    "description": "Recovery kit note."
+  },
+  "kitLostPassphrase": {
+    "message": "Without the passphrase nobody can open your data, not even the server's operator. A lost passphrase means lost data.",
+    "description": "Recovery kit warning (ACC-4)."
+  },
+  "kitHowToConnect": {
+    "message": "To connect another browser: install Tazamun, choose “Connect to an existing account”, paste the pairing code, then enter your passphrase.",
+    "description": "Recovery kit instructions."
+  },
+  "kitLead": {
+    "message": "Save this recovery kit. With it and your passphrase you can connect any browser to your account.",
+    "description": "Onboarding text above the recovery kit."
+  },
+  "deviceDefaultName": {
+    "message": "$BROWSER$ on $OS$",
+    "description": "Default device name, e.g. “Firefox on Windows”.",
+    "placeholders": {
+      "browser": { "content": "$1", "example": "Firefox" },
+      "os": { "content": "$2", "example": "Windows" }
+    }
   },
   "onboardingTitle": {
     "message": "Welcome to Tazamun",
@@ -35,8 +183,261 @@
     "message": "Tazamun keeps your tabs, history, bookmarks and extension list in sync across Chrome, Edge and Firefox. Everything is encrypted on your devices before it leaves them; the server only ever sees ciphertext.",
     "description": "First paragraph on the welcome page."
   },
-  "onboardingNext": {
-    "message": "Creating or connecting an account is coming in the next version.",
-    "description": "Welcome page note while account setup isn't built yet."
+  "onboardingCreate": {
+    "message": "Create an account",
+    "description": "Button: start creating a new account."
+  },
+  "onboardingCreateHelp": {
+    "message": "Your first browser with Tazamun.",
+    "description": "Hint under the create button."
+  },
+  "onboardingConnect": {
+    "message": "Connect to an existing account",
+    "description": "Button: connect this browser to an account made elsewhere."
+  },
+  "onboardingConnectHelp": {
+    "message": "You already use Tazamun in another browser.",
+    "description": "Hint under the connect button."
+  },
+  "onboardingReconnect": {
+    "message": "Sign in again to $SERVER$",
+    "description": "Button on the welcome page when this browser was connected before.",
+    "placeholders": { "server": { "content": "$1", "example": "sync.example.org" } }
+  },
+  "onboardingStep": {
+    "message": "Step $CURRENT$ of $TOTAL$",
+    "description": "Progress indicator.",
+    "placeholders": {
+      "current": { "content": "$1", "example": "2" },
+      "total": { "content": "$2", "example": "4" }
+    }
+  },
+  "onboardingBack": {
+    "message": "Back",
+    "description": "Button: previous step."
+  },
+  "onboardingContinue": {
+    "message": "Continue",
+    "description": "Button: next step."
+  },
+  "serverHeading": {
+    "message": "Your server",
+    "description": "Heading of the server step."
+  },
+  "serverLead": {
+    "message": "Tazamun stores your encrypted data on a server you choose, usually one you or someone you trust runs. Enter its address.",
+    "description": "Text on the server step."
+  },
+  "serverUrlLabel": {
+    "message": "Server address",
+    "description": "Label of the server URL field."
+  },
+  "serverOrPairingLabel": {
+    "message": "Pairing code or server address",
+    "description": "Label of the field on the connect path."
+  },
+  "serverOrPairingHelp": {
+    "message": "The pairing code is in the recovery kit and in Tazamun's settings on your other browser.",
+    "description": "Hint under the pairing code field."
+  },
+  "serverPermissionNote": {
+    "message": "Your browser will ask to let Tazamun talk to this server. Tazamun contacts no other site.",
+    "description": "Note before the host permission prompt."
+  },
+  "serverChecking": {
+    "message": "Checking the server…",
+    "description": "Shown while contacting the server."
+  },
+  "deviceHeading": {
+    "message": "This browser",
+    "description": "Heading of the device step."
+  },
+  "deviceNameLabel": {
+    "message": "Device name",
+    "description": "Label of the device name field."
+  },
+  "deviceNameHelp": {
+    "message": "Shown on your other devices, for example when sending a tab. Add the profile if you use several. The server can see this name.",
+    "description": "Hint under the device name field."
+  },
+  "modulesHeading": {
+    "message": "What to sync",
+    "description": "Heading of the module choice."
+  },
+  "moduleTabs": {
+    "message": "Open tabs",
+    "description": "Module name: tabs."
+  },
+  "moduleTabsHelp": {
+    "message": "See and open other browsers' tabs, and send tabs between them. Private windows are never included.",
+    "description": "Module description: tabs."
+  },
+  "modulesLater": {
+    "message": "History, bookmarks and the extension list follow in later versions.",
+    "description": "Note about modules not available yet."
+  },
+  "passphraseHeading": {
+    "message": "Your passphrase",
+    "description": "Heading of the passphrase step when creating."
+  },
+  "passphraseLead": {
+    "message": "Your passphrase encrypts everything. It never leaves this browser, and nobody can reset it, not even the server's operator.",
+    "description": "Text on the passphrase step."
+  },
+  "passphraseLabel": {
+    "message": "Passphrase",
+    "description": "Label of the passphrase field."
+  },
+  "passphraseConfirmLabel": {
+    "message": "Passphrase again",
+    "description": "Label of the passphrase confirmation field."
+  },
+  "passphraseHint": {
+    "message": "At least 12 characters. Several random words are strong and easy to type.",
+    "description": "Hint under the passphrase field."
+  },
+  "passphraseStrength0": {
+    "message": "Too short",
+    "description": "Strength estimate: below 12 characters."
+  },
+  "passphraseStrength1": {
+    "message": "Weak",
+    "description": "Strength estimate."
+  },
+  "passphraseStrength2": {
+    "message": "Fair",
+    "description": "Strength estimate."
+  },
+  "passphraseStrength3": {
+    "message": "Good",
+    "description": "Strength estimate."
+  },
+  "passphraseStrength4": {
+    "message": "Strong",
+    "description": "Strength estimate."
+  },
+  "passphraseAcknowledge": {
+    "message": "I understand that if I lose my passphrase, my synced data is lost. There is no reset.",
+    "description": "Checkbox the user must tick before creating the account (ACC-4)."
+  },
+  "inviteLabel": {
+    "message": "Invite code",
+    "description": "Label of the invite field."
+  },
+  "inviteHelp": {
+    "message": "This server needs an invite. Ask its operator for one.",
+    "description": "Hint under the invite field."
+  },
+  "createButton": {
+    "message": "Create account",
+    "description": "Button that creates the account."
+  },
+  "signInHeading": {
+    "message": "Sign in",
+    "description": "Heading of the passphrase step when connecting."
+  },
+  "accountIdLabel": {
+    "message": "Account ID",
+    "description": "Label of the account ID field."
+  },
+  "signInButton": {
+    "message": "Connect",
+    "description": "Button that signs in to an existing account."
+  },
+  "deriving": {
+    "message": "Securing your keys… this takes a few seconds.",
+    "description": "Shown while Argon2id runs."
+  },
+  "doneHeading": {
+    "message": "This browser is connected",
+    "description": "Heading of the last onboarding step."
+  },
+  "doneLead": {
+    "message": "Tazamun's toolbar button shows its status. To add another browser, install Tazamun there and use the pairing code from your recovery kit.",
+    "description": "Text of the last onboarding step."
+  },
+  "doneClose": {
+    "message": "Close this tab",
+    "description": "Button that closes the onboarding tab."
+  },
+  "errorServerUrlInvalid": {
+    "message": "That isn't a valid server address.",
+    "description": "Error: server URL can't be parsed."
+  },
+  "errorServerUrlInsecure": {
+    "message": "The server must use HTTPS. Plain HTTP works only for localhost.",
+    "description": "Error: http URL that isn't localhost."
+  },
+  "errorServerUrlExtra": {
+    "message": "Enter the server address only, without a user name, query or #.",
+    "description": "Error: URL with credentials, query or fragment."
+  },
+  "errorPairingInvalid": {
+    "message": "That pairing code isn't valid. Copy it again from the recovery kit or the other browser.",
+    "description": "Error: malformed pairing code."
+  },
+  "errorPermissionDenied": {
+    "message": "Tazamun needs permission to talk to the server. Try again and choose Allow.",
+    "description": "Error: host permission refused."
+  },
+  "errorUnreachable": {
+    "message": "The server couldn't be reached. Check the address and your connection.",
+    "description": "Error: network failure."
+  },
+  "errorNotTazamun": {
+    "message": "That address answers, but it isn't a Tazamun server, or it runs an incompatible version.",
+    "description": "Error: unexpected response."
+  },
+  "errorClientTooOld": {
+    "message": "This server needs a newer version of the extension. Update Tazamun and try again.",
+    "description": "Error: minClientVersion above ours."
+  },
+  "errorRegistrationClosed": {
+    "message": "This server doesn't accept new accounts.",
+    "description": "Error: registration closed."
+  },
+  "errorInviteRequired": {
+    "message": "This server needs an invite code.",
+    "description": "Error: missing invite."
+  },
+  "errorInviteInvalid": {
+    "message": "That invite code isn't valid, has expired, or was already used.",
+    "description": "Error: bad invite."
+  },
+  "errorPassphraseTooShort": {
+    "message": "The passphrase needs at least 12 characters.",
+    "description": "Error: passphrase too short."
+  },
+  "errorPassphraseMismatch": {
+    "message": "The two passphrases don't match.",
+    "description": "Error: confirmation differs."
+  },
+  "errorAcknowledge": {
+    "message": "Please confirm that you understand a lost passphrase can't be recovered.",
+    "description": "Error: checkbox not ticked."
+  },
+  "errorAccountIdInvalid": {
+    "message": "That account ID isn't valid. It has 22 characters and is in the recovery kit.",
+    "description": "Error: malformed account ID."
+  },
+  "errorInvalidCredentials": {
+    "message": "The account ID or passphrase is wrong.",
+    "description": "Error: sign-in refused (deliberately doesn't say which)."
+  },
+  "errorRateLimited": {
+    "message": "Too many attempts. Wait a minute and try again.",
+    "description": "Error: rate limited."
+  },
+  "errorUnsafeServer": {
+    "message": "The server sent key data that this extension refuses for your safety. Contact the server's operator.",
+    "description": "Error: KDF parameters below the floor or a key bundle that doesn't open."
+  },
+  "errorDeviceNameEmpty": {
+    "message": "Give this device a name.",
+    "description": "Error: empty device name."
+  },
+  "errorGeneric": {
+    "message": "Something went wrong. Please try again.",
+    "description": "Error: anything else."
   }
 }

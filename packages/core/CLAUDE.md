@@ -5,7 +5,7 @@ Read this before changing anything in `packages/core`. The repository-wide rules
 ## Rules for this package
 
 1. **No browser-extension, DOM or server APIs.** Only what Node 26 and current browsers share: ECMAScript, Web Crypto (`globalThis.crypto`), `TextEncoder`, `URL`. Code that needs `browser.*`, IndexedDB or SQLite belongs in an app.
-2. **Pure functions.** Pass in time (`now`) and state; return new values. No module-level mutable state, no I/O, no logging. The only exception is randomness in `crypto`: `seal` draws its own nonce, and `randomBytes`, `randomId` and `generateAccountKey` exist to create secrets. Callers must never supply nonces or keys from their own randomness.
+2. **Pure functions.** Pass in time (`now`) and state; return new values. No module-level mutable state, no I/O, no logging. The only exception is randomness in `crypto`: `seal` draws its own nonce, and `randomBytes`, `randomId` and `generateAccountKey` exist to create secrets. Callers must never supply nonces or keys from their own randomness. The second exception is `api`, the HTTP client, and the `account` flows that call it: they do network I/O, but only through a `fetch` the caller injects (tests pass a fake or the server's Hono app), and they keep no state between calls.
 3. **Everything is tested in Node and in browsers.** Every test runs in Node and in Chromium and Firefox. Merge functions, schemas and the HLC get property-based tests (fast-check), not only examples.
 4. **Stored formats are versioned.** Serialized HLCs, schemas, URL normalization and crypto parameters end up in users' records. Changing one needs a schema version bump and a migration, and usually an ADR.
 5. **Public API goes through `src/index.ts`**, one namespace per module (`export * as hlc from './hlc/index.ts'`). Don't make apps import from deep paths.
@@ -37,6 +37,14 @@ Read this before changing anything in `packages/core`. The repository-wide rules
 - Decryption errors are a bare `DecryptError` on purpose. Don't add detail (which check failed, which key): it helps an attacker and can leak data into logs.
 - Argon2id with 64 MiB is slow on purpose (about 0.5–1 s). Expose it so callers run it only at sign-in and unlock, never per sync.
 - Test vectors live in `test/vectors/`: Argon2id from the reference implementation's `test.c` (RFC 9106's own vector needs associated data, which `hash-wasm` doesn't support), HKDF from RFC 5869, HMAC from RFC 4231, AES-GCM from Wycheproof.
+
+### API client and account flows
+- **Validate every response** with the `schema` body, also on success. A hostile or broken server must not hand the extension malformed data; the client throws `NetworkError` (`kind: 'invalid-response'`) with field paths only, never values.
+- Errors carry the HTTP status, the stable `code` and the server's message. Never put request or response bodies, tokens or keys into an error (rule 5).
+- Branch on `ApiError.code` and `NetworkError.kind`, never on message text. Unknown codes from a newer server must fall through to a generic message, not crash.
+- The flows zero the auth key after use and never return the KEK. Keep it that way: only the account key and the session token leave a flow.
+- The pairing code format (`tazamun:<accountId>@<serverUrl>`) and `normalizeServerUrl` end up in recovery kits that users print. Treat both as stored formats (rule 4): old kits must keep parsing.
+- The strength estimate is deliberately simple and informs only; it never rejects a passphrase of 12+ characters. Don't grow it into a dictionary (hundreds of kilobytes) without an ADR.
 
 ### TypeScript and Web Crypto
 - The public namespace `crypto` hides the global Web Crypto `crypto` in any file that imports it under that name. Import it as `import { crypto as tzCrypto } from '@tazamun/core'`. Inside this package, the `crypto` module's own files use the global `crypto` and never import the namespace.

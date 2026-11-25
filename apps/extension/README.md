@@ -6,8 +6,10 @@ The Tazamun browser extension for Chrome, Edge and Firefox, built with [WXT](htt
 | ---- | ------ |
 | Scaffold: three targets, manifest with permissions, CSP, Firefox ID and data-collection disclosure | Done |
 | Background: opens onboarding on first install (UI-2) | Done |
-| Popup, options and onboarding pages (placeholders, localized, right-to-left ready) | Done |
-| Onboarding: create or connect an account, recovery kit, device registration (ACC-1…8, ACC-11) | Next |
+| Onboarding: create or connect an account (pairing code or account ID), device name, remember-key choice, modules, recovery kit (UI-2, ACC-1…8) | Done |
+| Signed-out, revoked and locked states; unlock, sign out, sign in again, remove from this browser (ACC-11, SEC-5) | Done |
+| Popup and options: account part (status, recovery kit download and print, pairing code) | Done |
+| Pairing code as a QR code (ACC-6) | Later: desktop browsers can't scan one, so it waits for the dashboard or mobile |
 | Sync engine in `src/engine/` (ENG-1…14) | P1 |
 | Tabs module in `src/modules/tabs/`, send tab, context menu (TAB-1…8, UI-4) | P1 |
 
@@ -34,6 +36,18 @@ Run from the repository root with `pnpm --filter @tazamun/extension <script>`:
 | `typecheck` | `wxt prepare`, then `vue-tsc` over the TypeScript and `.vue` files |
 
 Tests run with the rest of the workspace (`pnpm test`, project `extension`), in Node against WXT's in-memory fake browser.
+
+## Accounts on this device
+
+The flows come from `@tazamun/core` (`account`, `api`); `src/account/` adds the browser around them:
+
+| What | Where it's kept |
+| ---- | --------------- |
+| Server URL, account ID, device ID and name, session token | `storage.local` `account`. After sign-out or revocation only the token goes; the rest stays, so signing in again needs only the passphrase (ACC-11). |
+| Account key | `storage.local` with *Remember the key on this device* on (the default), otherwise `storage.session`, which the browser clears when it closes; the extension is then *locked* until the passphrase is entered (SEC-5). |
+| Remember-key choice and modules | `storage.local` `settings` |
+
+The passphrase, the KEK and the auth key are never stored. The host permission is requested for the server's host only, when the user continues from the server step. A 401 from the server means the device was revoked: the extension drops the token and key and shows the revoked state.
 
 ## Manifest and permissions
 
@@ -70,7 +84,11 @@ src/
     options/             options page (UI-3)
     onboarding/          unlisted page opened on install (UI-2)
   background/            background logic, as functions that take `browser` (tested)
-  lib/                   startup (jitless zod), i18n, page mounting, shared CSS
+  account/               storage (store.ts), sign-in flows with the browser (session.ts),
+                         device identity, recovery kit
+  onboarding/            form validation and error messages for the onboarding page
+  components/            shared Vue components (RecoveryKit.vue)
+  lib/                   startup (jitless zod), i18n, page mounting, download, shared CSS
 ```
 
 Planned: `src/engine/` for the sync engine and `src/modules/<type>/` for each data type ([ADR-0001](../../docs/adr/0001-one-product-module-architecture.md)).
