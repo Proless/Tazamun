@@ -15,6 +15,8 @@ import type { AnyModule } from '../engine/module.ts';
 import type { EngineStore } from '../engine/store.ts';
 import { POLL_PERIOD_MINUTES, PUSH_DEBOUNCE_MS } from '../engine/policy.ts';
 import { STATUS_KEY, badgeFor } from '../engine/status.ts';
+import type { CommandsModule } from '../modules/commands/module.ts';
+import { isSendableUrl } from '../modules/commands/send.ts';
 import { createModules } from '../modules/index.ts';
 
 export const POLL_ALARM = 'tz-poll';
@@ -23,28 +25,51 @@ export const RETRY_ALARM = 'tz-retry';
 const MIN_ALARM_MS = 30_000;
 
 /** Messages from popup and options to the background. */
-export type SyncMessage = { type: 'sync-now' } | { type: 'local-change' };
+export type SyncMessage =
+  | { type: 'sync-now' }
+  | { type: 'local-change' }
+  | { type: 'send-tab'; target: string; url: string; title?: string };
 
 export function isSyncMessage(value: unknown): value is SyncMessage {
   if (typeof value !== 'object' || value === null) return false;
-  const type = (value as { type?: unknown }).type;
-  return type === 'sync-now' || type === 'local-change';
+  const m = value as Record<string, unknown>;
+  if (m['type'] === 'sync-now' || m['type'] === 'local-change') return true;
+  return (
+    m['type'] === 'send-tab' &&
+    typeof m['target'] === 'string' &&
+    typeof m['url'] === 'string' &&
+    (m['title'] === undefined || typeof m['title'] === 'string')
+  );
 }
+
+export type SendResult = 'sent' | 'refused' | 'signed-out';
 
 export class BackgroundSync {
   readonly #browser: WxtBrowser;
   readonly #engine: SyncEngine;
   readonly #modules: readonly AnyModule[];
+  readonly #commands: CommandsModule | undefined;
   #debounce: ReturnType<typeof setTimeout> | undefined;
   #retry: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     browser: WxtBrowser,
-    options: { store?: Promise<EngineStore>; modules?: AnyModule[] } = {},
+    options: {
+      store?: Promise<EngineStore>;
+      modules?: AnyModule[];
+      commands?: CommandsModule;
+    } = {},
   ) {
     this.#browser = browser;
     const store = options.store ?? openEngineStore();
-    this.#modules = options.modules ?? createModules(browser);
+    if (options.modules === undefined) {
+      const created = createModules(browser);
+      this.#modules = created.all;
+      this.#commands = created.commands;
+    } else {
+      this.#modules = options.modules;
+      this.#commands = options.commands;
+    }
     this.#engine = new SyncEngine({
       store: {
         // The store opens lazily on first use; each method waits for it.
@@ -100,6 +125,20 @@ export class BackgroundSync {
         this.localChange(module.debounceMs);
       });
     }
+  }
+
+  /**
+   * TAB-7: queue a tab for another device and sync right away (PERF-2). Only web pages are sent;
+   * the pages check too, this is the last line.
+   */
+  async sendTab(target: string, tab: { url: string; title?: string }): Promise<SendResult> {
+    if (this.#commands === undefined || !isSendableUrl(tab.url)) return 'refused';
+    const state = await getAccountState(this.#browser);
+    if (state.status !== 'signed-in') return 'signed-out';
+    if (target === state.account.deviceId) return 'refused';
+    await this.#commands.send(target, state.account.deviceId, tab);
+    void this.sync('ui');
+    return 'sent';
   }
 
   /** ENG-4: a module saw a change; sync after the debounce, restarting it on every change. */

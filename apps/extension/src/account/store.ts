@@ -153,7 +153,15 @@ export async function markSignedOut(
  */
 export async function forgetAccount(browser: WxtBrowser): Promise<void> {
   await clearAccountKey(browser);
-  await browser.storage.local.remove([ACCOUNT_KEY, 'engineStatus', 'devices']);
+  await browser.storage.local.remove([
+    ACCOUNT_KEY,
+    'engineStatus',
+    'devices',
+    // The commands module's queues (src/modules/commands/module.ts).
+    'commandsOutgoing',
+    'commandsToDelete',
+    'commandsDone',
+  ]);
 }
 
 async function readAccountKey(browser: WxtBrowser): Promise<Uint8Array<ArrayBuffer> | undefined> {

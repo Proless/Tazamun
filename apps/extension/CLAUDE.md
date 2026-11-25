@@ -51,6 +51,14 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 - The popup must not load favicon URLs from tab records: that is a request to a third-party site (PRIV-4).
 - WXT's fake browser doesn't populate `windows.getAll` with tabs. Tests replace `fakeBrowser.windows.getAll` with their own windows.
 
+### Send tab (commands module)
+- Sending goes through the background (`send-tab` message, `BackgroundSync.sendTab`), which queues the command in `storage.local`. `detectLocalChanges` publishes queued commands and drops a queue entry only once the record is in the mirror (committed), so a crash publishes it again rather than losing it. Deletions after opening use the same pattern.
+- `apply` opens each command for this device at most once (`commandsDone`), because a page is applied again after a crash (REL-2). Never move the "done" write before the open: a crash would then lose the tab.
+- Validate the URL in the background too, not only in the popup: messages are input. Only `http:` and `https:` pages are sent, never from incognito tabs (rule 7).
+- The service worker has no clipboard (Chrome would need an offscreen document), so the receiving side shows a refused URL in the notification instead of copying it.
+- `contextMenus.create` reports errors through its callback and `runtime.lastError`; read it there, or Chrome logs "Unchecked runtime.lastError". Rebuild menus with `removeAll` first: items persist across service-worker restarts, and creating an existing ID fails.
+- Chrome requires `iconUrl` for notifications; it uses `ICONS` from `src/manifest.ts`. A test checks every icon file exists.
+
 ### MV3 and extension lifecycle
 - The Chrome service worker is **killed after about 30 s idle**; Firefox uses an event page (WXT builds `background.scripts` for Firefox and `background.service_worker` for Chromium). Any state in a module-level variable can vanish. Persist to IndexedDB or `storage`, and design every step to be resumable and idempotent.
 - `setTimeout`/`setInterval` don't survive suspension. Use `browser.alarms` (Chrome minimum 30 s; Tazamun's default is 60 s).

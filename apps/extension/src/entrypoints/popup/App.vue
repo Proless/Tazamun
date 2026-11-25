@@ -1,10 +1,11 @@
 <script setup lang="ts">
 // UI-1: account state (ACC-11, SEC-5), sync status with "Sync now" and "Pause" (ENG-5, ENG-12,
-// ENG-13), other devices' tabs (TAB-6). "Send this tab" comes with the commands collection (TAB-7).
+// ENG-13), "Send this tab" (TAB-7) and other devices' tabs (TAB-6).
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { browser } from 'wxt/browser';
 import type { schema } from '@tazamun/core';
 import OtherTabs from '../../components/OtherTabs.vue';
+import SendTab from '../../components/SendTab.vue';
 import { loadDevices } from '../../account/devices.ts';
 import type { SyncRecord } from '../../engine/module.ts';
 import { refreshAccountState } from '../../account/session.ts';
@@ -125,6 +126,7 @@ async function togglePause(): Promise<void> {
           {{ t('popupOpenSettings') }}
         </button>
       </div>
+      <SendTab :devices="devices" :self-id="state.account.deviceId" />
       <OtherTabs :records="tabs" :devices="devices" :self-id="state.account.deviceId" />
     </template>
   </main>
