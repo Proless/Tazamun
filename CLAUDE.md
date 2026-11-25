@@ -11,7 +11,7 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 ## Current status
 
 - **Phase:** P1 (engine, server, accounts, tabs). P0's exit criteria are met: workspace, tooling and CI are set up, and `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Q1 is decided: Hono and `node:sqlite`.
-- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `deploy/` (Dockerfile, Compose files, proxy examples; see [deploy/README.md](deploy/README.md)), `scripts/`, `docs/`, `.github/`. The image pipeline builds, smoke-tests and scans every PR and publishes `edge` from `main`. `apps/extension` has the WXT scaffold for three targets and onboarding: create or connect an account, recovery kit, lock, sign-out and revoked states (see [apps/extension/README.md](apps/extension/README.md)); `packages/core` has the API client and account flows they use. The sync engine runs in the extension's background (outbox and mirror in IndexedDB, alarm and popup pulls, backoff, status, pause), and the tabs module publishes each browser's tabs; the popup lists other browsers' tabs; send tab works from the popup and the context menu; the options page has the P1 settings. Next: the end-to-end tests.
+- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `deploy/` (Dockerfile, Compose files, proxy examples; see [deploy/README.md](deploy/README.md)), `scripts/`, `docs/`, `.github/`. The image pipeline builds, smoke-tests and scans every PR and publishes `edge` from `main`. `apps/extension` has the WXT scaffold for three targets and onboarding: create or connect an account, recovery kit, lock, sign-out and revoked states (see [apps/extension/README.md](apps/extension/README.md)); `packages/core` has the API client and account flows they use. The sync engine runs in the extension's background (outbox and mirror in IndexedDB, alarm and popup pulls, backoff, status, pause), and the tabs module publishes each browser's tabs; the popup lists other browsers' tabs; send tab works from the popup and the context menu; the options page has the P1 settings; an end-to-end suite runs Chromium and Firefox against the real server in CI. All P1 items are done; what remains for P1 is its exit criteria (a week of daily use on the `edge` image).
 - The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
@@ -66,7 +66,7 @@ docs/
 scripts/             repository maintenance scripts (license check)
 .github/
   workflows/ci.yml   lint, type-check, Node tests, browser tests, extension builds + web-ext lint,
-                     dependency audit, license check
+                     end-to-end tests (Chromium + Firefox), dependency audit, license check
   workflows/image.yml  image build for amd64 and arm64, smoke test, scan; publishes edge from main
                      (release.yml follows in P6)
   dependabot.yml     npm, GitHub Actions, Docker base image
@@ -100,6 +100,7 @@ Commands (Node 26, pnpm 12; install pnpm with `npm install -g pnpm`, since Node 
 | `pnpm --filter @tazamun/server smoke tazamun:test` | Container smoke test against a local image (DEP-29) |
 | `pnpm --filter @tazamun/extension dev` | Run the extension in Chrome with live reload (`dev:firefox` for Firefox) |
 | `pnpm --filter @tazamun/extension build` | Production builds for Chrome, Edge and Firefox in `apps/extension/.output/` |
+| `pnpm --filter @tazamun/extension test:e2e` | End-to-end tests against the build: Chromium and Firefox, real server ([apps/extension/README.md](apps/extension/README.md#end-to-end-tests)) |
 
 ---
 
@@ -135,7 +136,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 - [x] **Tabs module:** publish windows and tabs; incognito, scheme and exclusion filtering; strip favicons (TAB-1…6).
 - [x] **Send tab** through the `commands` collection, plus notifications and the context menu (TAB-7, TAB-8, UI-4).
 - [x] **Popup:** status, other devices' tabs, send tab (UI-1). **Options page:** basics (UI-3).
-- [ ] End-to-end test: two Chromium profiles and one server in Playwright; Firefox through `web-ext run`.
+- [x] End-to-end test: two Chromium profiles and one server in Playwright; Firefox through `web-ext run`. *(Chromium A through Playwright and the installed Firefox B through WebDriver BiDi, against the real server; `web-ext run` can't drive pages. Runs in CI.)*
 - [x] Settle Q2 (encrypt device names?) and Q3 (default for remembering the key). *(Plaintext names; remember by default: [ADR-0009](docs/adr/0009-device-names-and-key-storage.md).)*
 
 **Exit:** you use it daily on 3 browsers for a week, **against your own instance running the published `edge` image with `docker-compose.caddy.yml`**. A fresh VPS goes from nothing to a healthy HTTPS instance in under 10 minutes by following the docs. PERF-1 and PERF-2 are met. Killing the server or the service worker mid-sync loses nothing (REL-3). **You uninstall your current tab tool.**

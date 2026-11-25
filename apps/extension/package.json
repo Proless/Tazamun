@@ -14,7 +14,8 @@
     "zip": "wxt zip -b chrome && wxt zip -b edge && wxt zip -b firefox",
     "lint:firefox": "web-ext lint --source-dir .output/firefox-mv3 --self-hosted",
     "postinstall": "wxt prepare",
-    "typecheck": "wxt prepare && vue-tsc --noEmit"
+    "typecheck": "wxt prepare && vue-tsc --noEmit",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "dependencies": {
     "@tazamun/core": "workspace:*",
@@ -24,6 +25,7 @@
   "devDependencies": {
     "@wxt-dev/module-vue": "^1.0.3",
     "fake-indexeddb": "^6.2.8",
+    "playwright": "^1.65.1",
     "vue-tsc": "^3.3.14",
     "web-ext": "^10.8.0",
     "wxt": "^0.21.5"

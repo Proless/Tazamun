@@ -64,6 +64,14 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 - `contextMenus.create` reports errors through its callback and `runtime.lastError`; read it there, or Chrome logs "Unchecked runtime.lastError". Rebuild menus with `removeAll` first: items persist across service-worker restarts, and creating an existing ID fails.
 - Chrome requires `iconUrl` for notifications; it uses `ICONS` from `src/manifest.ts`. A test checks every icon file exists.
 
+### End-to-end tests
+- **Firefox runs as the installed release over WebDriver BiDi**, not Playwright's Firefox (it can't load extensions) and not `web-ext run` (it can't drive pages). `webExtension.install` loads the build; the profile's `extensions.webextensions.uuids` pref fixes the `moz-extension://` origin.
+- BiDi can't navigate to `moz-extension://` URLs, and can't run script in extension pages unless Firefox starts with `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1`. Extension pages are opened with `tabs.create` from an extension context (the onboarding tab that `onInstalled` opens).
+- **Clicks are real input** (`input.performActions` in Firefox, Playwright's `click` in Chromium). Firefox grants `permissions.request` only while handling user input; a scripted `button.click()` is refused.
+- The popup is opened as a tab, which makes it the active tab. "Send this tab" acts on the active tab, so the flow activates the web page again and reloads the popup.
+- Every failed sync backs off further (ENG-9). A test that polls a device while the server is down pushes its next automatic retry minutes away; open the popup (as a user would) to sync through the backoff.
+- Read popup text only after the section you need has rendered: the popup loads tabs from IndexedDB and the device list from the server separately.
+
 ### MV3 and extension lifecycle
 - The Chrome service worker is **killed after about 30 s idle**; Firefox uses an event page (WXT builds `background.scripts` for Firefox and `background.service_worker` for Chromium). Any state in a module-level variable can vanish. Persist to IndexedDB or `storage`, and design every step to be resumable and idempotent.
 - `setTimeout`/`setInterval` don't survive suspension. Use `browser.alarms` (Chrome minimum 30 s; Tazamun's default is 60 s).
