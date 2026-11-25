@@ -11,7 +11,7 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 ## Current status
 
 - **Phase:** P1 (engine, server, accounts, tabs). P0's exit criteria are met: workspace, tooling and CI are set up, and `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Q1 is decided: Hono and `node:sqlite`.
-- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `deploy/` (Dockerfile, Compose files, proxy examples; see [deploy/README.md](deploy/README.md)), `scripts/`, `docs/`, `.github/`. The image pipeline builds, smoke-tests and scans every PR and publishes `edge` from `main`. `apps/extension` has the WXT scaffold for three targets and onboarding: create or connect an account, recovery kit, lock, sign-out and revoked states (see [apps/extension/README.md](apps/extension/README.md)); `packages/core` has the API client and account flows they use. The sync engine runs in the extension's background (outbox and mirror in IndexedDB, alarm and popup pulls, backoff, status, pause), with no data-type module registered yet. Next: the tabs module.
+- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `deploy/` (Dockerfile, Compose files, proxy examples; see [deploy/README.md](deploy/README.md)), `scripts/`, `docs/`, `.github/`. The image pipeline builds, smoke-tests and scans every PR and publishes `edge` from `main`. `apps/extension` has the WXT scaffold for three targets and onboarding: create or connect an account, recovery kit, lock, sign-out and revoked states (see [apps/extension/README.md](apps/extension/README.md)); `packages/core` has the API client and account flows they use. The sync engine runs in the extension's background (outbox and mirror in IndexedDB, alarm and popup pulls, backoff, status, pause), and the tabs module publishes each browser's tabs; the popup lists other browsers' tabs. Next: send tab.
 - The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
@@ -61,7 +61,7 @@ deploy/              see deploy/README.md
   k8s/               (planned, P6) example manifests (one replica + PVC)
 docs/
   srs/               requirements (sections 1–6)
-  adr/               architecture decision records (0001–0008)
+  adr/               architecture decision records (0001–0009)
   guides/            self-hosting.md, server-configuration.md (generated); user and contributor docs follow
 scripts/             repository maintenance scripts (license check)
 .github/
@@ -114,7 +114,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 - [x] Renovate or Dependabot configured for npm, GitHub Actions and Docker base-image digests (DEP-37).
 - [x] `packages/core/crypto`: Argon2id (WASM), HKDF, AES-GCM wrap and unwrap, payload encrypt and decrypt with AAD. **Test vectors** committed. *(Library choice and format details: [ADR-0008](docs/adr/0008-crypto-implementation.md).)*
 - [x] `packages/core/hlc`: HLC with tests (monotonic, clock skew, comparison including device ID).
-- [x] `packages/core/schema`: record envelope plus a payload schema per collection (zod), with schema versions. *(`bookmarks` follows in P4 and `devices` after Q2.)*
+- [x] `packages/core/schema`: record envelope plus a payload schema per collection (zod), with schema versions. *(`bookmarks` follows in P4. No `devices` collection: names are plaintext, ADR-0009.)*
 - [x] Settle Q1 (server framework and SQLite driver) and record it in ADR-0004. *(Hono and `node:sqlite`.)*
 - [x] Write `CONTRIBUTING.md` and a short README "How it works" section linking the SRS.
 
@@ -132,11 +132,11 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 - [x] **Onboarding:** create or connect an account, recovery kit, device registration (ACC-1…8, ACC-11, UI-2).
 - [x] **Engine:** outbox in IndexedDB, debounced push, alarm and popup-triggered pull, backoff, status, pause, per-module toggles (ENG-1…14).
 - [x] **Module interface** plus an in-memory fake browser for tests. *(WXT's fake browser, plus `FakeServer` and `FakeTabsModule` in `apps/extension/src/engine/testing.ts`.)*
-- [ ] **Tabs module:** publish windows and tabs; incognito, scheme and exclusion filtering; strip favicons (TAB-1…6).
+- [x] **Tabs module:** publish windows and tabs; incognito, scheme and exclusion filtering; strip favicons (TAB-1…6).
 - [ ] **Send tab** through the `commands` collection, plus notifications and the context menu (TAB-7, TAB-8, UI-4).
 - [ ] **Popup:** status, other devices' tabs, send tab (UI-1). **Options page:** basics (UI-3).
 - [ ] End-to-end test: two Chromium profiles and one server in Playwright; Firefox through `web-ext run`.
-- [ ] Settle Q2 (encrypt device names?) and Q3 (default for remembering the key).
+- [x] Settle Q2 (encrypt device names?) and Q3 (default for remembering the key). *(Plaintext names; remember by default: [ADR-0009](docs/adr/0009-device-names-and-key-storage.md).)*
 
 **Exit:** you use it daily on 3 browsers for a week, **against your own instance running the published `edge` image with `docker-compose.caddy.yml`**. A fresh VPS goes from nothing to a healthy HTTPS instance in under 10 minutes by following the docs. PERF-1 and PERF-2 are met. Killing the server or the service worker mid-sync loses nothing (REL-3). **You uninstall your current tab tool.**
 
@@ -216,7 +216,7 @@ From [SRS 6.5](<docs/srs/6. Other Requirements.md#65-known-limitations-and-open-
 - Desktop only. Chrome and Edge on Android can't run the extension.
 - One server instance per `/data`, on local storage only (SQLite). No horizontal scaling and no high availability in 1.0 ([ADR-0007](docs/adr/0007-container-distribution.md)).
 - The browser's own address-bar autocomplete won't suggest pages visited only in other browsers (use `tz`) ([ADR-0005](docs/adr/0005-history-stored-in-extension.md)).
-- Open questions Q2–Q6 in SRS 6.5 are still to be decided (Q1 is decided).
+- Open questions Q4–Q6 in SRS 6.5 are still to be decided (Q1–Q3 are decided).
 
 ## Pitfalls (read before working in each area)
 

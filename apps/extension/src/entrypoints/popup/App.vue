@@ -1,18 +1,30 @@
 <script setup lang="ts">
 // UI-1: account state (ACC-11, SEC-5), sync status with "Sync now" and "Pause" (ENG-5, ENG-12,
-// ENG-13). Other devices' tabs and "Send this tab" arrive with the tabs module.
+// ENG-13), other devices' tabs (TAB-6). "Send this tab" comes with the commands collection (TAB-7).
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { browser } from 'wxt/browser';
+import type { schema } from '@tazamun/core';
+import OtherTabs from '../../components/OtherTabs.vue';
+import { loadDevices } from '../../account/devices.ts';
+import type { SyncRecord } from '../../engine/module.ts';
 import { refreshAccountState } from '../../account/session.ts';
 import type { AccountState } from '../../account/store.ts';
 import type { EngineStatus } from '../../engine/engine.ts';
 import { statusMessageKey } from '../../engine/status.ts';
-import { t } from '../../lib/i18n.ts';
+import { t, uiLocale } from '../../lib/i18n.ts';
 import { openOnboarding } from '../../lib/pages.ts';
-import { readStatus, requestSync, togglePaused, watchStatus } from '../../lib/sync-client.ts';
+import {
+  readMirror,
+  readStatus,
+  requestSync,
+  togglePaused,
+  watchStatus,
+} from '../../lib/sync-client.ts';
 
 const state = ref<AccountState | undefined>();
 const status = ref<EngineStatus | undefined>();
+const tabs = ref<SyncRecord<schema.TabsData>[]>([]);
+const devices = ref<schema.Device[] | undefined>();
 let stopWatching: (() => void) | undefined;
 
 const host = computed(() => {
@@ -25,18 +37,27 @@ const statusLine = computed(() => {
   if (s === undefined) return '';
   const key = statusMessageKey(s);
   if (key !== 'statusIdle' || s.lastSuccessAt === undefined) return t(key);
-  return t(key, [new Date(s.lastSuccessAt).toLocaleTimeString([], { timeStyle: 'short' })]);
+  return t(key, [new Date(s.lastSuccessAt).toLocaleTimeString(uiLocale(), { timeStyle: 'short' })]);
 });
 
 onMounted(async () => {
   stopWatching = watchStatus(browser, (next) => {
+    const finished = status.value?.state === 'syncing' && next.state !== 'syncing';
     status.value = next;
+    if (finished) void loadTabs();
   });
   state.value = await refreshAccountState(browser);
   status.value = await readStatus(browser);
+  if (state.value.status !== 'signed-in') return;
+  await loadTabs();
   // ENG-5: opening the popup checks for changes right away (PERF-1: within 5 s).
-  if (state.value.status === 'signed-in') void requestSync(browser);
+  void requestSync(browser);
+  devices.value = await loadDevices(browser);
 });
+
+async function loadTabs(): Promise<void> {
+  tabs.value = await readMirror<schema.TabsData>('tabs');
+}
 
 onUnmounted(() => {
   stopWatching?.();
@@ -89,7 +110,6 @@ async function togglePause(): Promise<void> {
       <p v-if="status && status.pending > 0" class="muted hint">
         {{ t('statusPending', [String(status.pending)]) }}
       </p>
-      <p class="muted hint">{{ t('popupSyncComing') }}</p>
       <div class="actions">
         <button
           type="button"
@@ -105,6 +125,7 @@ async function togglePause(): Promise<void> {
           {{ t('popupOpenSettings') }}
         </button>
       </div>
+      <OtherTabs :records="tabs" :devices="devices" :self-id="state.account.deviceId" />
     </template>
   </main>
 </template>
