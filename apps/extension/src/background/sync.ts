@@ -28,12 +28,14 @@ const MIN_ALARM_MS = 30_000;
 export type SyncMessage =
   | { type: 'sync-now' }
   | { type: 'local-change' }
-  | { type: 'send-tab'; target: string; url: string; title?: string };
+  | { type: 'send-tab'; target: string; url: string; title?: string }
+  | { type: 'retire'; collection: string };
 
 export function isSyncMessage(value: unknown): value is SyncMessage {
   if (typeof value !== 'object' || value === null) return false;
   const m = value as Record<string, unknown>;
   if (m['type'] === 'sync-now' || m['type'] === 'local-change') return true;
+  if (m['type'] === 'retire') return typeof m['collection'] === 'string';
   return (
     m['type'] === 'send-tab' &&
     typeof m['target'] === 'string' &&
@@ -139,6 +141,13 @@ export class BackgroundSync {
     await this.#commands.send(target, state.account.deviceId, tab);
     void this.sync('ui');
     return 'sent';
+  }
+
+  /** PRIV-2: delete this device's data for a module that was turned off. */
+  async retire(collection: string): Promise<EngineStatus> {
+    const status = await this.#engine.retire(collection);
+    await this.#scheduleRetry(status);
+    return status;
   }
 
   /** ENG-4: a module saw a change; sync after the debounce, restarting it on every change. */

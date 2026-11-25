@@ -9,6 +9,7 @@ The Tazamun browser extension for Chrome, Edge and Firefox, built with [WXT](htt
 | Onboarding: create or connect an account (pairing code or account ID), device name, remember-key choice, modules, recovery kit (UI-2, ACC-1…8) | Done |
 | Signed-out, revoked and locked states; unlock, sign out, sign in again, remove from this browser (ACC-11, SEC-5) | Done |
 | Popup and options: account part (status, recovery kit download and print, pairing code) | Done |
+| Options page (UI-3, P1 part): rename this device, remember the key, sync status and pause, modules on or off with the PRIV-2 question, sites that never sync, devices with *Remove* (ACC-8), recovery kit, sign out | Done |
 | Pairing code as a QR code (ACC-6) | Later: desktop browsers can't scan one, so it waits for the dashboard or mobile |
 | Sync engine in `src/engine/`: module interface, outbox and mirror in IndexedDB, debounced push, alarm and popup pull, backoff, status, pause, per-module switches (ENG-1…14) | Done |
 | Toolbar badge for error, locked and paused only (UI-6) | Done |
@@ -109,7 +110,8 @@ src/
   entrypoints/           one folder or file per extension entry point (WXT convention)
     background.ts        registers listeners at the top level
     popup/               toolbar popup (UI-1)
-    options/             options page (UI-3)
+    onboarding/            form validation and error messages for the onboarding page
+  options/               options page logic: rename, revoke, modules (PRIV-2), exclusion list             options page (UI-3)
     onboarding/          unlisted page opened on install (UI-2)
   background/            background logic: install, sync scheduling, context menus (tested)
   engine/                sync engine: module interface, engine, IndexedDB and memory stores,

@@ -1,41 +1,27 @@
 <script setup lang="ts">
-// UI-3 (account part): server and account, recovery kit (ACC-5), remember the key (SEC-5),
-// unlock, sign out and the signed-out state (ACC-11). Modules, exclusions and the rest follow.
+// UI-3: the signed-out, revoked and locked states (ACC-11, SEC-5) here; everything for a
+// signed-in device is in SignedInSettings.vue. History retention, bookmark snapshots and export
+// follow with their modules (P2, P4, P6).
 import { onMounted, ref } from 'vue';
 import { browser } from 'wxt/browser';
-import RecoveryKit from '../../components/RecoveryKit.vue';
+import SignedInSettings from '../../components/SignedInSettings.vue';
 import { refreshAccountState, signOut, unlock } from '../../account/session.ts';
-import {
-  forgetAccount,
-  getSettings,
-  setRememberKey,
-  type AccountState,
-} from '../../account/store.ts';
+import { forgetAccount, type AccountState } from '../../account/store.ts';
 import { openEngineStore } from '../../engine/idb-store.ts';
 import { t } from '../../lib/i18n.ts';
 import { openOnboarding } from '../../lib/pages.ts';
 import { errorKey, type MessageKey } from '../../onboarding/form.ts';
 
 const state = ref<AccountState | undefined>();
-const rememberKey = ref(true);
 const passphrase = ref('');
 const busy = ref(false);
 const error = ref<MessageKey | undefined>();
 
 async function load(): Promise<void> {
-  const [current, settings] = await Promise.all([
-    refreshAccountState(browser),
-    getSettings(browser),
-  ]);
-  state.value = current;
-  rememberKey.value = settings.rememberKey;
+  state.value = await refreshAccountState(browser);
 }
 
 onMounted(load);
-
-async function changeRemember(): Promise<void> {
-  await setRememberKey(browser, rememberKey.value);
-}
 
 async function submitUnlock(): Promise<void> {
   error.value = undefined;
@@ -130,23 +116,16 @@ async function setUp(): Promise<void> {
 
     <template v-else>
       <dl class="facts no-print">
-        <dt>{{ t('optionsDeviceName') }}</dt>
-        <dd>{{ state.account.deviceName }}</dd>
+        <dt>{{ t('optionsServer') }}</dt>
+        <dd>
+          <code>{{ state.account.serverUrl }}</code>
+        </dd>
+        <dt>{{ t('optionsAccountId') }}</dt>
+        <dd>
+          <code>{{ state.account.accountId }}</code>
+        </dd>
       </dl>
-      <RecoveryKit :server-url="state.account.serverUrl" :account-id="state.account.accountId" />
-      <label class="check no-print">
-        <input v-model="rememberKey" type="checkbox" @change="changeRemember" />
-        <span>
-          {{ t('optionsRememberKey') }}
-          <span class="muted hint block">{{ t('optionsRememberKeyHelp') }}</span>
-        </span>
-      </label>
-      <div class="actions spaced no-print">
-        <button type="button" class="secondary" :disabled="busy" @click="doSignOut">
-          {{ t('optionsSignOut') }}
-        </button>
-        <span class="muted hint">{{ t('optionsSignOutHelp') }}</span>
-      </div>
+      <SignedInSettings :account="state.account" @sign-out="doSignOut" @changed="load" />
     </template>
 
     <p v-if="error" role="alert" class="error">{{ t(error) }}</p>

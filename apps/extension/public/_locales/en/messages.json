@@ -65,10 +65,6 @@
     "message": "Account ID",
     "description": "Label for the account ID."
   },
-  "optionsDeviceName": {
-    "message": "This device",
-    "description": "Label for this device's name."
-  },
   "optionsRememberKey": {
     "message": "Remember the key on this device",
     "description": "Checkbox: keep the account key after the browser closes."
@@ -664,5 +660,89 @@
   "sendFailed": {
     "message": "The tab couldn't be sent. Try again.",
     "description": "Shown when sending failed."
+  },
+  "optionsThisBrowser": {
+    "message": "This browser",
+    "description": "Options section heading."
+  },
+  "optionsRename": {
+    "message": "Rename",
+    "description": "Button: save the device name."
+  },
+  "optionsSaved": {
+    "message": "Saved.",
+    "description": "Shown after saving a setting."
+  },
+  "optionsSave": {
+    "message": "Save",
+    "description": "Button: save."
+  },
+  "optionsCancel": {
+    "message": "Cancel",
+    "description": "Button: cancel."
+  },
+  "optionsSync": {
+    "message": "Sync",
+    "description": "Options section heading."
+  },
+  "moduleOffQuestion": {
+    "message": "Turn off tabs sync on this browser. Also delete this browser's tabs from the server, so your other browsers no longer show them?",
+    "description": "Asked when turning off the tabs module (PRIV-2)."
+  },
+  "moduleOffDelete": {
+    "message": "Turn off and delete",
+    "description": "Button: turn the module off and delete this device's data from the server."
+  },
+  "moduleOffKeep": {
+    "message": "Turn off, keep on server",
+    "description": "Button: turn the module off and keep the data on the server."
+  },
+  "exclusionsHeading": {
+    "message": "Sites that never sync",
+    "description": "Options section heading (PRIV-3)."
+  },
+  "exclusionsHelp": {
+    "message": "One site per line. Tabs from these sites never leave this browser, and later its history won't either. bank.example also covers its subdomains; health.example/records covers only that part of the site.",
+    "description": "Explains the exclusion list format."
+  },
+  "exclusionsInvalid": {
+    "message": "These lines aren't usable site names: $LINES$",
+    "description": "Error for invalid exclusion patterns.",
+    "placeholders": {
+      "lines": {
+        "content": "$1",
+        "example": "ex*ample"
+      }
+    }
+  },
+  "exclusionsAddExamples": {
+    "message": "Add common sign-in and mail sites",
+    "description": "Button: add example exclusions."
+  },
+  "devicesHeading": {
+    "message": "Devices",
+    "description": "Options section heading: the account's browsers."
+  },
+  "devicesThisOne": {
+    "message": "this browser",
+    "description": "Marks the current device in the list."
+  },
+  "devicesRevoke": {
+    "message": "Remove",
+    "description": "Button: revoke that device (ACC-8)."
+  },
+  "devicesRevokeConfirm": {
+    "message": "Remove “$DEVICE$” from your account? It stops syncing at once and has to sign in again with the passphrase.",
+    "description": "Confirmation before revoking a device.",
+    "placeholders": {
+      "device": {
+        "content": "$1",
+        "example": "Firefox on Work laptop"
+      }
+    }
+  },
+  "devicesUnavailable": {
+    "message": "The device list can't be loaded right now.",
+    "description": "Shown when offline with no cached list."
   }
 }

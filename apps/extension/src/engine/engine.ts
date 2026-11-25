@@ -17,7 +17,7 @@
  * URLs, keys or record IDs (ENG-14): only states, counts and error codes.
  */
 import { api, crypto as tzCrypto, hlc, merge, schema } from '@tazamun/core';
-import type { AnyModule, MirrorView, Payload, SyncRecord } from './module.ts';
+import type { AnyModule, LocalChange, MirrorView, Payload, SyncRecord } from './module.ts';
 import { FULL_RECONCILE_AFTER_MS, TOMBSTONE_TTL_MS, backoffDelay, planBatches } from './policy.ts';
 import type { EngineMeta, EngineStore, MirrorEntry, OutboxEntry } from './store.ts';
 
@@ -96,6 +96,8 @@ export class SyncEngine {
   readonly #deps: EngineDeps;
   #running: Promise<EngineStatus> | undefined;
   #again: Trigger | undefined;
+  /** PRIV-2: collections whose records from this device should be deleted on the server. */
+  readonly #retiring = new Set<string>();
 
   constructor(deps: EngineDeps) {
     this.#deps = deps;
@@ -125,12 +127,23 @@ export class SyncEngine {
     return this.#running;
   }
 
+  /**
+   * PRIV-2: a module was turned off and the user chose to delete this device's data for it from
+   * the server. The module's `retire` names the records; they are queued as deletions (even while
+   * paused, so the choice survives) and pushed with the next run, which starts right away.
+   */
+  retire(collection: string): Promise<EngineStatus> {
+    this.#retiring.add(collection);
+    return this.sync('ui');
+  }
+
   async #runOnce(trigger: Trigger): Promise<EngineStatus> {
     const { store } = this.#deps;
     const session = await this.#deps.session();
     if (session === 'signed-out' || session === 'locked') {
       return this.#publish({ state: session });
     }
+    if (this.#retiring.size > 0) await this.#queueRetirements(session);
     const switches = await this.#deps.switches();
     if (switches.paused) return this.#publish({ state: 'paused' });
 
@@ -190,27 +203,55 @@ export class SyncEngine {
         mirror: this.#mirrorView(name),
         deviceId: ctx.session.deviceId,
       });
-      if (changes.length === 0) continue;
-      const key = await ctx.keys.collectionKey(name);
-      const mirrorPut: MirrorEntry[] = [];
-      const outboxPut: OutboxEntry[] = [];
-      for (const change of changes) {
-        ctx.clock = hlc.tick(ctx.clock, this.#deps.now());
-        const stamp = hlc.serialize(ctx.clock);
-        const payload: Payload<unknown> =
-          change.deleted === true
-            ? schema.tombstonePayload(module.collection, stamp)
-            : schema.livePayload(module.collection, stamp, change.data);
-        const expiresAt = change.deleted === true ? this.#tombstoneExpiry() : change.expiresAt;
-        mirrorPut.push({ collection: name, id: change.id, payload });
-        outboxPut.push(await this.#outboxEntry(ctx, key, name, change.id, payload, expiresAt));
-      }
-      await this.#deps.store.commit({
-        mirrorPut,
-        outboxPut,
-        meta: { clock: hlc.serialize(ctx.clock) },
-      });
+      await this.#queueChanges(ctx, module, changes);
     }
+  }
+
+  async #queueRetirements(session: EngineSession): Promise<void> {
+    const meta = await this.#deps.store.getMeta();
+    if (meta.owner !== `${session.serverUrl} ${session.accountId}`) return;
+    const ctx = {
+      session,
+      keys: await tzCrypto.deriveAccountKeys(session.accountKey),
+      clock: loadClock(meta, session.deviceId),
+    };
+    for (const name of [...this.#retiring]) {
+      const module = this.#deps.modules.find((m) => m.collection.name === name);
+      const changes =
+        (await module?.retire?.({ mirror: this.#mirrorView(name), deviceId: session.deviceId })) ??
+        [];
+      if (module !== undefined) await this.#queueChanges(ctx, module, changes);
+      this.#retiring.delete(name);
+    }
+  }
+
+  /** Stamp, encrypt and queue local changes with the mirror update, in one commit. */
+  async #queueChanges(
+    ctx: Pick<RunContext, 'session' | 'keys' | 'clock'>,
+    module: AnyModule,
+    changes: readonly LocalChange<unknown>[],
+  ): Promise<void> {
+    if (changes.length === 0) return;
+    const name = module.collection.name;
+    const key = await ctx.keys.collectionKey(name);
+    const mirrorPut: MirrorEntry[] = [];
+    const outboxPut: OutboxEntry[] = [];
+    for (const change of changes) {
+      ctx.clock = hlc.tick(ctx.clock, this.#deps.now());
+      const stamp = hlc.serialize(ctx.clock);
+      const payload: Payload<unknown> =
+        change.deleted === true
+          ? schema.tombstonePayload(module.collection, stamp)
+          : schema.livePayload(module.collection, stamp, change.data);
+      const expiresAt = change.deleted === true ? this.#tombstoneExpiry() : change.expiresAt;
+      mirrorPut.push({ collection: name, id: change.id, payload });
+      outboxPut.push(await this.#outboxEntry(ctx, key, name, change.id, payload, expiresAt));
+    }
+    await this.#deps.store.commit({
+      mirrorPut,
+      outboxPut,
+      meta: { clock: hlc.serialize(ctx.clock) },
+    });
   }
 
   // ---- 2. Push ---------------------------------------------------------------------------------
@@ -416,7 +457,7 @@ export class SyncEngine {
   }
 
   async #outboxEntry(
-    ctx: RunContext,
+    ctx: Pick<RunContext, 'session'>,
     key: CryptoKey,
     collection: string,
     id: string,
