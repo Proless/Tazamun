@@ -14,7 +14,8 @@ The Tazamun browser extension for Chrome, Edge and Firefox, built with [WXT](htt
 | Toolbar badge for error, locked and paused only (UI-6) | Done |
 | Tabs module in `src/modules/tabs/`: windows and tabs of this device, private windows, privileged schemes and exclusions left out, favicons stripped, 5 s debounce (TAB-1…5) | Done |
 | Popup: *Tabs on other browsers* by device and window, last seen, open one or all (TAB-6) | Done |
-| Send tab, notifications, context menu (TAB-7, TAB-8, UI-4) | Next |
+| Send tab: popup *Send this tab*, context menu *Send page/link to*, the target opens it in the background with a notification, the command is deleted after (TAB-7, TAB-8, UI-4) | Done |
+| Icons (placeholder design) in `public/icons/` | Done |
 
 ## Development
 
@@ -102,6 +103,7 @@ Development only: `wxt` and `@wxt-dev/module-vue` (build, dev server, fake brows
 ```text
 wxt.config.ts            WXT configuration; takes the manifest from src/manifest.ts
 public/_locales/en/      messages.json: every UI string and the store name and description
+public/icons/            16, 32, 48, 128 px PNG (placeholder design)
 src/
   manifest.ts            manifest per browser: permissions, CSP, Firefox settings
   entrypoints/           one folder or file per extension entry point (WXT convention)
@@ -109,10 +111,11 @@ src/
     popup/               toolbar popup (UI-1)
     options/             options page (UI-3)
     onboarding/          unlisted page opened on install (UI-2)
-  background/            background logic, as functions that take `browser` (tested)
+  background/            background logic: install, sync scheduling, context menus (tested)
   engine/                sync engine: module interface, engine, IndexedDB and memory stores,
                          timing and batching policy, status; testing.ts: fake server and module
-  modules/               index.ts registers the data-type modules; tabs/ (snapshot, module, view, open)
+  modules/               index.ts registers the data-type modules; tabs/ (snapshot, module, view,
+                         open); commands/ (send tab: module, send rules, receiving)
   account/               storage (store.ts), sign-in flows with the browser (session.ts),
                          device identity, recovery kit
   onboarding/            form validation and error messages for the onboarding page

@@ -77,6 +77,17 @@ export const OPTIONAL_HOST_PERMISSIONS = [
   'http://127.0.0.1/*',
 ] as const;
 
+/**
+ * Toolbar, extensions page, stores and notifications (Chrome requires an icon for those). The
+ * files are in `public/icons/`. A placeholder until there is a real design.
+ */
+export const ICONS = {
+  '16': 'icons/16.png',
+  '32': 'icons/32.png',
+  '48': 'icons/48.png',
+  '128': 'icons/128.png',
+} as const;
+
 export interface ManifestFields {
   name: string;
   description: string;
@@ -85,7 +96,8 @@ export interface ManifestFields {
   optional_permissions: string[];
   optional_host_permissions: string[];
   content_security_policy: { extension_pages: string };
-  action: { default_title: string };
+  icons: Record<string, string>;
+  action: { default_title: string; default_icon: Record<string, string> };
   browser_specific_settings?: {
     gecko: {
       id: string;
@@ -105,7 +117,8 @@ export function manifestFor(browser: TargetBrowser): ManifestFields {
     optional_permissions: [...OPTIONAL_PERMISSIONS],
     optional_host_permissions: [...OPTIONAL_HOST_PERMISSIONS],
     content_security_policy: { extension_pages: EXTENSION_PAGES_CSP },
-    action: { default_title: '__MSG_extName__' },
+    icons: { ...ICONS },
+    action: { default_title: '__MSG_extName__', default_icon: { ...ICONS } },
   };
   if (browser === 'firefox') {
     manifest.browser_specific_settings = {

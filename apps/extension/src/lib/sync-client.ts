@@ -4,7 +4,7 @@
  */
 import type { WxtBrowser } from 'wxt/browser';
 import { getSettings, saveSettings } from '../account/store.ts';
-import type { SyncMessage } from '../background/sync.ts';
+import type { SendResult, SyncMessage } from '../background/sync.ts';
 import type { EngineStatus } from '../engine/engine.ts';
 import { openEngineStore } from '../engine/idb-store.ts';
 import type { Payload, SyncRecord } from '../engine/module.ts';
@@ -59,5 +59,22 @@ export async function readMirror<Data>(collection: string): Promise<SyncRecord<D
       .map((e) => ({ id: e.id, payload: e.payload as Payload<Data> }));
   } finally {
     store.close();
+  }
+}
+
+/** TAB-7: ask the background to send a tab to another device. */
+export async function sendTab(
+  browser: WxtBrowser,
+  target: string,
+  tab: { url: string; title?: string },
+): Promise<SendResult | undefined> {
+  const message: SyncMessage = { type: 'send-tab', target, ...tab };
+  try {
+    const result: unknown = await browser.runtime.sendMessage(message);
+    return result === 'sent' || result === 'refused' || result === 'signed-out'
+      ? result
+      : undefined;
+  } catch {
+    return undefined;
   }
 }
