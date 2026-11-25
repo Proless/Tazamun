@@ -58,6 +58,26 @@ jobs:
       # Mozilla's own checks, as AMO runs them on upload (errors fail; warnings are listed).
       - run: pnpm --filter @tazamun/extension lint:firefox
 
+  e2e:
+    name: End to end (Chromium + Firefox)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tazamun/extension build
+      - run: pnpm --filter @tazamun/extension exec playwright install --with-deps chromium
+      # The runner image ships Firefox; browser B runs in it through WebDriver BiDi.
+      - name: Locate Firefox
+        run: |
+          firefox --version
+          echo "FIREFOX_BINARY=$(readlink -f "$(command -v firefox)")" >> "$GITHUB_ENV"
+      - run: pnpm --filter @tazamun/extension test:e2e
+
   audit:
     name: Dependency audit
     runs-on: ubuntu-latest

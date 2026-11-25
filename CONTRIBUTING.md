@@ -29,8 +29,9 @@ pnpm --filter @tazamun/core exec playwright install chromium firefox   # once, f
 | `pnpm --filter @tazamun/server dev` | Run the server locally ([apps/server/README.md](apps/server/README.md)) |
 | `pnpm --filter @tazamun/server tazamun <command>` | Run an admin command, such as `invite create` |
 | `pnpm --filter @tazamun/extension dev` | Run the extension in Chrome with live reload (`dev:firefox` for Firefox) |
+| `pnpm --filter @tazamun/extension build` then `test:e2e` | End-to-end tests: Chromium and the installed Firefox against the real server |
 
-CI runs all of these except the server and extension `dev` commands on every pull request; it also builds the extension for all three browsers and runs `web-ext lint`.
+CI runs all of these except the server and extension `dev` commands on every pull request; it also builds the extension for all three browsers, runs `web-ext lint`, and runs the end-to-end tests in Chromium and Firefox.
 
 ## Rules every change must follow
 

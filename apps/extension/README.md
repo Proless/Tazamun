@@ -39,8 +39,31 @@ Run from the repository root with `pnpm --filter @tazamun/extension <script>`:
 | `zip` | Store packages for all three targets |
 | `lint:firefox` | Mozilla's `web-ext lint` on the Firefox build, as AMO runs it (build first) |
 | `typecheck` | `wxt prepare`, then `vue-tsc` over the TypeScript and `.vue` files |
+| `test:e2e` | End-to-end suite against the built extension (build first), see below |
 
 Tests run with the rest of the workspace (`pnpm test`, project `extension`), in Node against WXT's in-memory fake browser.
+
+### End-to-end tests
+
+`e2e/` drives the built extension in two real browsers against the real server (a child process with a temporary data directory) and a tiny local website, so nothing reaches the internet:
+
+```sh
+pnpm --filter @tazamun/extension build
+pnpm --filter @tazamun/extension test:e2e
+```
+
+Browser A is Chromium (Playwright; once: `pnpm --filter @tazamun/extension exec playwright install chromium`). Browser B is the installed Firefox, driven through WebDriver BiDi; set `FIREFOX_BINARY` if it isn't found, or `E2E_BROWSER_B=chromium` to use a second Chromium profile instead. The scenarios share one account, in order:
+
+| Scenario | Requirements |
+| -------- | ------------ |
+| Create the account on A, connect B with the pairing code | SRS 3.1, ACC-1…7 |
+| Each browser's tabs appear in the other's popup, with the device name | TAB-1, TAB-6 |
+| Send a tab A → B and B → A from the popup | TAB-7, PERF-2 |
+| Kill the server, change tabs, restart: the change arrives, nothing pending | REL-3 |
+| A removes B; B shows the revoked state and keeps its account data | ACC-8, ACC-11 |
+| The server log holds no URLs or titles | rule 5 |
+
+CI runs it on every pull request (job *End to end*), with the runner's Firefox.
 
 ## Accounts on this device
 
@@ -97,12 +120,14 @@ The CSP is `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'`: WASM for A
 | `zod` | Schemas from `@tazamun/core`, in jitless mode for the CSP |
 | `@tazamun/core` | Crypto, HLC and schemas, shared with the server and dashboard |
 
-Development only: `wxt` and `@wxt-dev/module-vue` (build, dev server, fake browser for tests), `vue-tsc` (type-checks `.vue` files), `web-ext` (Mozilla's linter) and `fake-indexeddb` (runs the IndexedDB store's tests in Node).
+Development only: `wxt` and `@wxt-dev/module-vue` (build, dev server, fake browser for tests), `vue-tsc` (type-checks `.vue` files), `web-ext` (Mozilla's linter) `fake-indexeddb` (runs the IndexedDB store's tests in Node) and `playwright` (the end-to-end tests).
 
 ## Layout
 
 ```text
 wxt.config.ts            WXT configuration; takes the manifest from src/manifest.ts
+vitest.e2e.config.ts     the end-to-end project (not part of pnpm test)
+e2e/                     drivers (Chromium, Firefox over BiDi), server and site, flows, scenarios
 public/_locales/en/      messages.json: every UI string and the store name and description
 public/icons/            16, 32, 48, 128 px PNG (placeholder design)
 src/
