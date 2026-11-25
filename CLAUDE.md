@@ -96,10 +96,8 @@ Commands (Node 26, pnpm 12; install pnpm with `npm install -g pnpm`, since Node 
 | `pnpm licenses:check` | Dependency license policy ([scripts/README.md](scripts/README.md)) |
 | `pnpm --filter @tazamun/server dev` | Run the server locally (copy `apps/server/.env.example` to `.env` first) |
 | `pnpm --filter @tazamun/server tazamun <command>` | Admin commands: invites, backup, restore, accounts ([apps/server/README.md](apps/server/README.md#admin-commands)) |
-
 | `docker build -f deploy/docker/Dockerfile -t tazamun:test .` | Build the server image locally, for testing ([deploy/README.md](deploy/README.md)) |
 | `pnpm --filter @tazamun/server smoke tazamun:test` | Container smoke test against a local image (DEP-29) |
-
 | `pnpm --filter @tazamun/extension dev` | Run the extension in Chrome with live reload (`dev:firefox` for Firefox) |
 | `pnpm --filter @tazamun/extension build` | Production builds for Chrome, Edge and Firefox in `apps/extension/.output/` |
 
@@ -283,6 +281,7 @@ Pitfalls for one app or package live in that folder's `CLAUDE.md`. The sections 
 - **Pin third-party actions by commit SHA**, with the version in a comment (`uses: docker/build-push-action@<sha> # v7.4.0`). Tags can be moved; `trivy-action`'s were hijacked in 2026. Dependabot updates SHA pins. Pick releases at least two weeks old, as `minimumReleaseAge` does for npm.
 - **The repository is private for now.** Code scanning needs GitHub Advanced Security there, so `image.yml` uploads SARIF only when the repository is public. Packages published from a private repository are private too: make `ghcr.io/proless/tazamun` public when the repository goes public, or self-hosters can't pull it.
 - **The smoke test** (`apps/server/test/smoke.ts`) runs on the runner, talks to the container over a random loopback port, and uses `@tazamun/core` like a real client (Argon2id included). Run it locally with `pnpm --filter @tazamun/server smoke <image>`.
+- **The arm64 smoke test runs under QEMU and has failed once on a PR that didn't touch the server:** the container logged "Listening" and exited, and the re-run passed. If it fails, read the exit code, OOMKilled flag and stderr it prints (132 or 139 point at emulation, 137 with OOMKilled at the memory limit), re-run once, and investigate if it repeats.
 - **Token scope:** don't give the workflow `write-all`. Use `packages: write` and `id-token: write` only where needed, and keep the Docker Hub token out of PR workflows from forks.
 - **Reverse proxies:** nginx's default `client_max_body_size` (1 MB) is below the API's 2 MB batch limit, and missing `X-Forwarded-Proto` breaks the public-URL check. Both belong in the proxy examples.
 

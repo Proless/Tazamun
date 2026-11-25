@@ -12,7 +12,7 @@
  * Usage (from the repository root): node apps/server/test/smoke.ts <image>
  * Always removes its container and volume, also on failure.
  */
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { crypto as tzCrypto, hlc, schema } from '@tazamun/core';
 
@@ -52,7 +52,16 @@ async function waitHealthy(timeoutMs = 90_000): Promise<void> {
     const status = docker('inspect', '--format', '{{.State.Health.Status}}', container);
     if (status === 'healthy') return;
     const running = docker('inspect', '--format', '{{.State.Running}}', container);
-    check(running === 'true', 'The container exited before it became healthy');
+    if (running !== 'true') {
+      // Exit code 137 with OOMKilled means the memory limit; 132/139 under QEMU, an emulation crash.
+      const state = docker(
+        'inspect',
+        '--format',
+        'exit code {{.State.ExitCode}}, OOMKilled {{.State.OOMKilled}}, error "{{.State.Error}}"',
+        container,
+      );
+      throw new Error(`The container exited before it became healthy (${state})`);
+    }
     check(
       Date.now() < deadline,
       `Not healthy after ${String(timeoutMs / 1000)} s (status: ${status})`,
@@ -257,7 +266,10 @@ try {
   failed = true;
   process.stderr.write(`Smoke test FAILED: ${err instanceof Error ? err.message : String(err)}\n`);
   try {
-    process.stderr.write(`--- container logs ---\n${docker('logs', container)}\n`);
+    // The server writes warnings and errors to stderr, so show both streams.
+    const logs = spawnSync('docker', ['logs', container], { encoding: 'utf8' });
+    process.stderr.write(`--- container stdout ---\n${logs.stdout}\n`);
+    process.stderr.write(`--- container stderr ---\n${logs.stderr}\n`);
   } catch {
     // No container to show logs from.
   }
