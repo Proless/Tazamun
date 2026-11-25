@@ -7,8 +7,9 @@ The shared library of Tazamun: everything that the extension, the dashboard and 
 | `hlc` | Done | Hybrid Logical Clock: orders edits across devices (ENG-7, [ADR-0003](../../docs/adr/0003-sync-protocol-records-hlc.md)) |
 | `schema` | Done for `tabs`, `commands`, `history`, `extensions` | Wire format of the HTTP API (records, plus account, session, key, device and info bodies and the error codes), and decrypted payload schemas per collection (zod) ([SRS 4.4](<../../docs/srs/4. External Interface Requirements.md#44-communications-interfaces>)). `bookmarks` follows in P4, `devices` after Q2. |
 | `crypto` | Done | Argon2id key derivation, account-key wrapping, HKDF collection keys, AES-GCM payload encryption with AAD, keyed history IDs ([SRS 5.2](<../../docs/srs/5. Other Nonfunctional Requirements.md#52-security-requirements>), [ADR-0008](../../docs/adr/0008-crypto-implementation.md)) |
+| `api` | Done | Typed client for the HTTP API: every response validated with the `schema` bodies, typed `ApiError` (stable code, `retryAfter`) and `NetworkError`; client version check against `minClientVersion` |
+| `account` | Done | Create, connect and unlock flows (ACC-1…3, ACC-7, ACC-8, SEC-5), server URL rules, pairing codes (ACC-6), passphrase length and strength estimate (ACC-4) |
 | merge functions | P1+ | One pure merge function per data type |
-| API client | P1 | Typed client for the HTTP API |
 
 ## Usage
 
@@ -86,6 +87,28 @@ const payload = schema.livePayload(schema.COLLECTIONS.tabs, hlc.serialize(clock)
 const tombstone = schema.tombstonePayload(schema.COLLECTIONS.tabs, hlc.serialize(clock));
 ```
 
+Creating and connecting an account with the API client (SRS 3.1). The passphrase, KEK and account key never reach the server:
+
+```ts
+import { account, api } from '@tazamun/core';
+
+const serverUrl = account.normalizeServerUrl(input); // "sync.example.org" → "https://sync.example.org"
+const client = new api.ApiClient({ baseUrl: serverUrl }); // fetch is injectable for tests
+
+// First browser (ACC-1…3): one Argon2id run, then this device is signed in.
+const device = { id: account.newDeviceId(), name: 'Firefox on Linux', browser: { family: 'firefox', version: '140' } };
+const created = await account.createAccount(client, { passphrase, device, invite });
+// created: { accountId, accountKey, token, device }
+
+// Second browser: from a pairing code (server URL + account ID, never keys).
+const code = account.formatPairingCode({ serverUrl, accountId: created.accountId });
+const { accountId } = account.parsePairingCode(code);
+const connected = await account.connectAccount(client, { accountId, passphrase, device: otherDevice });
+
+// Errors: api.ApiError has the stable `code` (INVALID_CREDENTIALS, INVITE_REQUIRED…);
+// api.NetworkError has `kind` (unreachable, timeout, invalid-response).
+```
+
 Apps that parse with these schemas must call `z.config({ jitless: true })` at startup when they run under a CSP without `eval` (extension, dashboard).
 
 The package exports its TypeScript source directly (`"exports": "./src/index.ts"`); there is no build step.
@@ -115,6 +138,14 @@ Run from the repository root:
 ```text
 src/
   index.ts        public API: re-exports each module as a namespace
+  api/
+    client.ts     ApiClient (injected fetch), ApiError, NetworkError
+    version.ts    compareVersions, isClientSupported (minClientVersion)
+  account/
+    flows.ts      createAccount, connectAccount, unlockAccount
+    server-url.ts normalizeServerUrl, hostPermissionPattern
+    pairing.ts    pairing code format v1 (ACC-6)
+    passphrase.ts minimum length and strength estimate (ACC-4)
   crypto/
     encoding.ts   base64url, UTF-8, random bytes
     kdf.ts        Argon2id (hash-wasm), KDF parameter limits, authKey/KEK split

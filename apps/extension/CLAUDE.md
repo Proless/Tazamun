@@ -12,7 +12,8 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 6. **Pass `browser` in, don't import it in logic.** Functions such as `onInstalled(browser, details)` take the browser as a parameter, so tests pass `wxt/browser` (the fake browser under Vitest) and nothing reaches for globals.
 7. **All UI text comes from `public/_locales/en/messages.json`** through `t()` (SRS 6.3), with a `description` for translators. Layouts use logical CSS properties (`margin-inline`, `padding-block`, `inline-size`), so right-to-left languages need no extra rules. Each page sets `lang` and `dir` through `mountPage`.
 8. **Every entry point calls `startup()` first** (pages through `mountPage`, the background directly), which sets zod to jitless mode before any parse.
-9. **Never capture private or incognito browsing** (rule 7), and never log URLs, titles, keys or tokens (rule 5), not even in development builds.
+9. **Never store the passphrase, the KEK or the auth key**, not even in `storage.session`. Only the account key (where SEC-5 says) and the session token are kept, in `src/account/store.ts` only. Clear the passphrase fields once a flow finishes.
+10. **Never capture private or incognito browsing** (rule 7), and never log URLs, titles, keys or tokens (rule 5), not even in development builds.
 
 ## Pitfalls
 
@@ -22,6 +23,14 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 - WXT copies the popup's `<title>` into `action.default_title` (the toolbar tooltip), so the popup's `<title>` is `__MSG_extName__`. A `manifest.default_title` meta tag is ignored.
 - The tsconfig extends the repository base **and** `.wxt/tsconfig.json`; WXT's settings (bundler resolution, DOM lib) win where they overlap.
 - `fakeBrowser.reset()` leaves one blank tab open. Compare against the tabs that existed before, as `install.test.ts` does.
+
+### Accounts and permissions
+- **`permissions.request` must run before the first `await` in a click handler.** Browsers grant it only during a user gesture, and an `await` ends the gesture. `submitServer` in the onboarding page parses the URL synchronously, calls `requestServerPermission`, then awaits. Keep that order.
+- Match patterns have no port, and Firefox rejects one: request `http://localhost/*`, not `http://localhost:8080/*` (`account.hostPermissionPattern`).
+- Headless Chromium can't click the permission prompt. For an end-to-end run, load a copy of the build whose manifest already grants `http://localhost/*`; Chrome then answers `permissions.request` without a prompt.
+- `/v1/info` with a revoked token is a 401, not an anonymous answer. `refreshAccountState` treats both as signed out, and treats network errors as *still signed in* (offline isn't signed out).
+- Keep the device ID across sign-outs: tabs and extension records use it as their record ID, so a new ID would leave the old records behind as a ghost device.
+- WXT's fake browser doesn't implement `i18n`, `permissions` or `runtime.getPlatformInfo`. Tests that reach them assign a stub (`fakeBrowser.i18n.getMessage = …`) or keep those calls out of the tested function.
 
 ### MV3 and extension lifecycle
 - The Chrome service worker is **killed after about 30 s idle**; Firefox uses an event page (WXT builds `background.scripts` for Firefox and `background.service_worker` for Chromium). Any state in a module-level variable can vanish. Persist to IndexedDB or `storage`, and design every step to be resumable and idempotent.
@@ -46,5 +55,6 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 - AMO requires source code and build instructions for bundled code. Keep builds reproducible from the start (lockfile, `pnpm --filter @tazamun/extension build`).
 - **Firefox data-collection consent:** new add-ons must declare `data_collection_permissions` (Firefox 140+, hence `strict_min_version: 140.0`). Sending data to the user's own server counts as collection even though it is encrypted, so tabs and history are declared as `browsingActivity`. Re-check the categories against Mozilla's policy before every AMO submission. `web-ext lint` warns that Firefox for Android can't use the key; the extension is desktop-only.
 - `web-ext lint` warns about an `innerHTML` assignment inside Vue's runtime. That's Vue's own code, not ours; reviewers know it. Never write `innerHTML` (or `v-html`) in our code.
+- `web-ext lint` also reports `DANGEROUS_EVAL` for zod's `allowsEval` probe (`Function('')` inside a `try`). With `z.config({ jitless: true })` the probe returns before reaching it, so it never runs and the CSP stays quiet. Mention both in the AMO reviewer notes.
 - Store reviewers will question `history`, `tabs`, `management` and `bookmarks`. Keep the justifications ready (the comments in `src/manifest.ts` are the start), and request host permission only for the user's server URL.
 - Extension updates reach users over days. The server must stay compatible with at least the previous client version (`minClientVersion`).
