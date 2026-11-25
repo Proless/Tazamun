@@ -7,6 +7,7 @@ import { startup } from '../lib/startup.ts';
 export default defineBackground(() => {
   startup();
   const sync = new BackgroundSync(browser);
+  sync.watchModules();
 
   // MV3: register listeners synchronously at the top level of the background script, or events
   // that wake a suspended service worker are missed (apps/extension/CLAUDE.md, MV3 pitfalls).

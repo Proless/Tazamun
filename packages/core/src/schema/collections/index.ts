@@ -8,5 +8,5 @@ export * from './extensions.ts';
 export * from './history.ts';
 export * from './tabs.ts';
 
-/** Every collection with a payload schema, by name. `bookmarks` (P4) and `devices` (Q2) follow. */
+/** Every collection with a payload schema, by name. `bookmarks` follows in P4. */
 export const COLLECTIONS = { tabs, commands, history, extensions } as const;

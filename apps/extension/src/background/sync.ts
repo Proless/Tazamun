@@ -34,6 +34,7 @@ export function isSyncMessage(value: unknown): value is SyncMessage {
 export class BackgroundSync {
   readonly #browser: WxtBrowser;
   readonly #engine: SyncEngine;
+  readonly #modules: readonly AnyModule[];
   #debounce: ReturnType<typeof setTimeout> | undefined;
   #retry: ReturnType<typeof setTimeout> | undefined;
 
@@ -43,6 +44,7 @@ export class BackgroundSync {
   ) {
     this.#browser = browser;
     const store = options.store ?? openEngineStore();
+    this.#modules = options.modules ?? createModules(browser);
     this.#engine = new SyncEngine({
       store: {
         // The store opens lazily on first use; each method waits for it.
@@ -53,7 +55,7 @@ export class BackgroundSync {
         commit: async (commit) => (await store).commit(commit),
         clear: async () => (await store).clear(),
       },
-      modules: options.modules ?? createModules(),
+      modules: this.#modules,
       session: async () => {
         const state = await getAccountState(browser);
         if (state.status === 'signed-in') {
@@ -88,13 +90,25 @@ export class BackgroundSync {
     return status;
   }
 
-  /** ENG-4: a module saw a change; push after the debounce, restarting it on every change. */
-  localChange(): void {
+  /**
+   * Register every module's browser events (`SyncModule.watch`). Call synchronously at the top
+   * level of the background script, so events that wake a suspended worker reach the listeners.
+   */
+  watchModules(): void {
+    for (const module of this.#modules) {
+      module.watch?.(() => {
+        this.localChange(module.debounceMs);
+      });
+    }
+  }
+
+  /** ENG-4: a module saw a change; sync after the debounce, restarting it on every change. */
+  localChange(delayMs: number = PUSH_DEBOUNCE_MS): void {
     if (this.#debounce !== undefined) clearTimeout(this.#debounce);
     this.#debounce = setTimeout(() => {
       this.#debounce = undefined;
       void this.sync('local-change');
-    }, PUSH_DEBOUNCE_MS);
+    }, delayMs);
   }
 
   async onAlarm(name: string): Promise<void> {

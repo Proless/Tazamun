@@ -50,6 +50,7 @@ describe('account storage (SEC-5, ACC-11)', () => {
     expect(await getSettings(browser)).toEqual({
       rememberKey: true,
       paused: false,
+      exclusions: [],
       modules: { tabs: true },
     });
   });

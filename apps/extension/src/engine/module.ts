@@ -60,6 +60,15 @@ export interface SyncModule<Data> {
    * other devices (tabs) usually need nothing here; the UI reads the mirror.
    */
   apply(records: SyncRecord<Data>[]): Promise<void>;
+
+  /**
+   * Optional: register the browser events that may mean a local change, calling `notify` for
+   * each. The background calls it synchronously at its top level (MV3) and then runs
+   * `detectLocalChanges` after `debounceMs` of quiet.
+   */
+  watch?(notify: () => void): void;
+  /** Debounce for this module's change events; default PUSH_DEBOUNCE_MS (ENG-4). */
+  readonly debounceMs?: number;
 }
 
 /** Any module, for the engine's registry. */

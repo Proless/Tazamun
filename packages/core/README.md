@@ -5,7 +5,7 @@ The shared library of Tazamun: everything that the extension, the dashboard and 
 | Module | Status | What it does |
 | ------ | ------ | ------------ |
 | `hlc` | Done | Hybrid Logical Clock: orders edits across devices (ENG-7, [ADR-0003](../../docs/adr/0003-sync-protocol-records-hlc.md)) |
-| `schema` | Done for `tabs`, `commands`, `history`, `extensions` | Wire format of the HTTP API (records, plus account, session, key, device and info bodies and the error codes), and decrypted payload schemas per collection (zod) ([SRS 4.4](<../../docs/srs/4. External Interface Requirements.md#44-communications-interfaces>)). `bookmarks` follows in P4, `devices` after Q2. |
+| `schema` | Done for `tabs`, `commands`, `history`, `extensions` | Wire format of the HTTP API (records, plus account, session, key, device and info bodies and the error codes), and decrypted payload schemas per collection (zod) ([SRS 4.4](<../../docs/srs/4. External Interface Requirements.md#44-communications-interfaces>)). `bookmarks` follows in P4. |
 | `crypto` | Done | Argon2id key derivation, account-key wrapping, HKDF collection keys, AES-GCM payload encryption with AAD, keyed history IDs ([SRS 5.2](<../../docs/srs/5. Other Nonfunctional Requirements.md#52-security-requirements>), [ADR-0008](../../docs/adr/0008-crypto-implementation.md)) |
 | `api` | Done | Typed client for the HTTP API: every response validated with the `schema` bodies, typed `ApiError` (stable code, `retryAfter`) and `NetworkError`; client version check against `minClientVersion` |
 | `account` | Done | Create, connect and unlock flows (ACC-1…3, ACC-7, ACC-8, SEC-5), server URL rules, pairing codes (ACC-6), passphrase length and strength estimate (ACC-4) |

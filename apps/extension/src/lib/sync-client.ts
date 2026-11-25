@@ -6,6 +6,8 @@ import type { WxtBrowser } from 'wxt/browser';
 import { getSettings, saveSettings } from '../account/store.ts';
 import type { SyncMessage } from '../background/sync.ts';
 import type { EngineStatus } from '../engine/engine.ts';
+import { openEngineStore } from '../engine/idb-store.ts';
+import type { Payload, SyncRecord } from '../engine/module.ts';
 import { STATUS_KEY, parseStatus } from '../engine/status.ts';
 
 /** ENG-5: sync now (popup opened, or the button). Resolves when the run finished. */
@@ -43,4 +45,19 @@ export function watchStatus(
 export async function togglePaused(browser: WxtBrowser): Promise<void> {
   const settings = await getSettings(browser);
   await saveSettings(browser, { ...settings, paused: !settings.paused });
+}
+
+/**
+ * The mirror of one collection, for pages that show synced data (the popup's other tabs). Read
+ * only: pages never write the engine's store. Held records (ENG-10) are left out.
+ */
+export async function readMirror<Data>(collection: string): Promise<SyncRecord<Data>[]> {
+  const store = await openEngineStore();
+  try {
+    return (await store.listMirror(collection))
+      .filter((e) => e.payload !== undefined)
+      .map((e) => ({ id: e.id, payload: e.payload as Payload<Data> }));
+  } finally {
+    store.close();
+  }
 }

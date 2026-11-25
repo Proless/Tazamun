@@ -11,11 +11,20 @@ export function t(key: MessageKey, substitutions?: string | string[]): string {
 }
 
 /**
+ * The locale of the messages actually loaded, which can differ from the browser's UI language
+ * when Tazamun has no translation for it (the browser then falls back to English). Dates and times
+ * use it so they match the surrounding text.
+ */
+export function uiLocale(): string {
+  return t('uiLocale') || browser.i18n.getUILanguage();
+}
+
+/**
  * Set the page's language and text direction from the browser's UI locale, so right-to-left
  * languages lay out correctly (SRS 6.3), and its title from `_locales`.
  */
 export function applyDocumentLocale(document: Document, titleKey: MessageKey): void {
-  document.documentElement.lang = browser.i18n.getUILanguage();
+  document.documentElement.lang = uiLocale();
   document.documentElement.dir = browser.i18n.getMessage('@@bidi_dir') === 'rtl' ? 'rtl' : 'ltr';
   document.title = t(titleKey);
 }

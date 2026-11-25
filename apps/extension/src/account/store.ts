@@ -38,6 +38,8 @@ const settings = z.object({
   rememberKey: z.boolean().default(true),
   /** ENG-12: all sync paused on this device. */
   paused: z.boolean().default(false),
+  /** PRIV-3, TAB-3: sites that never leave this device (patterns: `src/lib/exclusions.ts`). */
+  exclusions: z.array(z.string().max(500)).max(1000).default([]),
   modules: z.object({ tabs: z.boolean().default(true) }).prefault({}),
 });
 export type Settings = z.infer<typeof settings>;
@@ -151,7 +153,7 @@ export async function markSignedOut(
  */
 export async function forgetAccount(browser: WxtBrowser): Promise<void> {
   await clearAccountKey(browser);
-  await browser.storage.local.remove([ACCOUNT_KEY, 'engineStatus']);
+  await browser.storage.local.remove([ACCOUNT_KEY, 'engineStatus', 'devices']);
 }
 
 async function readAccountKey(browser: WxtBrowser): Promise<Uint8Array<ArrayBuffer> | undefined> {

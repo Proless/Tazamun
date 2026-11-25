@@ -10,9 +10,11 @@ The Tazamun browser extension for Chrome, Edge and Firefox, built with [WXT](htt
 | Signed-out, revoked and locked states; unlock, sign out, sign in again, remove from this browser (ACC-11, SEC-5) | Done |
 | Popup and options: account part (status, recovery kit download and print, pairing code) | Done |
 | Pairing code as a QR code (ACC-6) | Later: desktop browsers can't scan one, so it waits for the dashboard or mobile |
-| Sync engine in `src/engine/`: module interface, outbox and mirror in IndexedDB, debounced push, alarm and popup pull, backoff, status, pause, per-module switches (ENG-1…14) | Done (no module registered yet) |
+| Sync engine in `src/engine/`: module interface, outbox and mirror in IndexedDB, debounced push, alarm and popup pull, backoff, status, pause, per-module switches (ENG-1…14) | Done |
 | Toolbar badge for error, locked and paused only (UI-6) | Done |
-| Tabs module in `src/modules/tabs/`, send tab, context menu (TAB-1…8, UI-4) | P1 |
+| Tabs module in `src/modules/tabs/`: windows and tabs of this device, private windows, privileged schemes and exclusions left out, favicons stripped, 5 s debounce (TAB-1…5) | Done |
+| Popup: *Tabs on other browsers* by device and window, last seen, open one or all (TAB-6) | Done |
+| Send tab, notifications, context menu (TAB-7, TAB-8, UI-4) | Next |
 
 ## Development
 
@@ -110,7 +112,7 @@ src/
   background/            background logic, as functions that take `browser` (tested)
   engine/                sync engine: module interface, engine, IndexedDB and memory stores,
                          timing and batching policy, status; testing.ts: fake server and module
-  modules/               the registry of data-type modules (tabs next)
+  modules/               index.ts registers the data-type modules; tabs/ (snapshot, module, view, open)
   account/               storage (store.ts), sign-in flows with the browser (session.ts),
                          device identity, recovery kit
   onboarding/            form validation and error messages for the onboarding page

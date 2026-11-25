@@ -10,7 +10,7 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 4. **Explicit imports, no auto-imports** (`imports: false` in `wxt.config.ts`): `import { browser } from 'wxt/browser'`, `import { defineBackground } from 'wxt/utils/define-background'`. Every file says where its names come from, and type-aware ESLint can check it.
 5. **Logic lives in `.ts` files, not in `.vue` files.** ESLint doesn't parse `.vue` files yet, and pure functions are unit-tested in Node with the fake browser. Components call into `src/lib/` or later `src/engine/` and `src/modules/<type>/`.
 6. **Pass `browser` in, don't import it in logic.** Functions such as `onInstalled(browser, details)` take the browser as a parameter, so tests pass `wxt/browser` (the fake browser under Vitest) and nothing reaches for globals.
-7. **All UI text comes from `public/_locales/en/messages.json`** through `t()` (SRS 6.3), with a `description` for translators. Layouts use logical CSS properties (`margin-inline`, `padding-block`, `inline-size`), so right-to-left languages need no extra rules. Each page sets `lang` and `dir` through `mountPage`.
+7. **All UI text comes from `public/_locales/en/messages.json`** through `t()` (SRS 6.3), with a `description` for translators. Layouts use logical CSS properties (`margin-inline`, `padding-block`, `inline-size`), so right-to-left languages need no extra rules. Each page sets `lang` and `dir` through `mountPage`. Dates and times use `uiLocale()` (the `uiLocale` message, which each translation sets to its own code), never `getUILanguage()`: the browser's language differs from the loaded text whenever Tazamun has no translation for it, and the page would mix German dates into English text.
 8. **Every entry point calls `startup()` first** (pages through `mountPage`, the background directly), which sets zod to jitless mode before any parse.
 9. **Never store the passphrase, the KEK or the auth key**, not even in `storage.session`. Only the account key (where SEC-5 says) and the session token are kept, in `src/account/store.ts` only. Clear the passphrase fields once a flow finishes.
 10. **Never capture private or incognito browsing** (rule 7), and never log URLs, titles, keys or tokens (rule 5), not even in development builds.
@@ -43,6 +43,13 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 - `runtime.onMessage` in Chrome needs `sendResponse` plus `return true`. WXT uses the plain `chrome` API there, without a promise polyfill, so a returned promise doesn't reach the page.
 - The background listens to `storage.onChanged` for `account`, `accountKey` and `settings`. The engine writes only `engineStatus`, so it never triggers itself; keep it that way.
 - Engine tests use `FakeServer` and `FakeTabsModule` from `src/engine/testing.ts`. Module tests should use them too: they speak the real wire format through `@tazamun/core`'s schemas.
+
+### Tabs module
+- `detectLocalChanges` reads `windows.getAll({ populate: true, windowTypes: ['normal'] })` every time; the events registered in `watch` only say "look again" (rule 4). Missed events during suspension are caught by the next alarm.
+- Incognito is filtered twice, per window and per tab (rule 7), and windows left empty aren't published, so not even the number of private windows leaks.
+- Other devices' tabs are never written to the browser (`apply` is empty); the popup reads them from the mirror with `readMirror`. Never open them automatically (SRS 3.3).
+- The popup must not load favicon URLs from tab records: that is a request to a third-party site (PRIV-4).
+- WXT's fake browser doesn't populate `windows.getAll` with tabs. Tests replace `fakeBrowser.windows.getAll` with their own windows.
 
 ### MV3 and extension lifecycle
 - The Chrome service worker is **killed after about 30 s idle**; Firefox uses an event page (WXT builds `background.scripts` for Firefox and `background.service_worker` for Chromium). Any state in a module-level variable can vanish. Persist to IndexedDB or `storage`, and design every step to be resumable and idempotent.
