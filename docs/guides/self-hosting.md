@@ -63,6 +63,22 @@ Run them with `docker compose exec tazamun tazamun <command>` while the server r
 
 `restore` is the exception: it needs the server stopped. See below. All commands are described in the [server README](../../apps/server/README.md#admin-commands).
 
+## Hosting several people
+
+One server hosts any number of accounts. Each person creates their own account with their own passphrase. Accounts can't see each other's data, and you, as the operator, can't read anyone's: the server stores only ciphertext.
+
+1. **Pick a registration mode** (`TAZAMUN_REGISTRATION`):
+   - `invite` (the default): only people with a one-time invite can create an account. Create one per person with `invite create --expires 7d`, send it to them, and check `invite list` for unused ones.
+   - `open`: anyone who can reach the server can create an account. Use it only on a private network.
+   - `closed`: no new accounts, for example once everyone has joined. Existing accounts keep working.
+2. **Size the quota.** `TAZAMUN_STORAGE_QUOTA_MB` limits each account (default 200 MiB). Tabs and the extension list stay under 1 MB, bookmarks about 3 MB for 5,000 of them, and a year of history 30–60 MB. Plan disk space for the number of accounts times what they actually use (`accounts list` shows it), not times the quota.
+3. **Tell people what you can see.** You can't read tabs, history or bookmarks, but you can see account IDs, device names (they are stored in plaintext, [ADR-0009](../adr/0009-device-names-and-key-storage.md)), browser families and versions, how much each account stores, when it last synced, and IP addresses in proxy logs.
+4. **Removing someone:** they find their account ID in Tazamun's settings or their recovery kit. `accounts delete <id> --yes` deletes the account, its devices and its data, after writing a backup.
+
+Nobody, including you, can reset a forgotten passphrase. If someone forgets theirs and has no browser still signed in, their data is lost. The fix is a new account (send a new invite) and an `accounts delete` of the old one.
+
+**One person with several accounts** (work and personal, or on two servers): connect one browser profile per account. Each profile runs its own copy of the extension, signed in to its own account; Chrome and Edge call them profiles, Firefox calls them profiles too (`about:profiles`). A profile connects to one account at a time.
+
 ## Data and storage
 
 Everything the server keeps is in the `/data` volume: the SQLite database with its `-wal` and `-shm` files, the instance secret, and automatic backups in `/data/backups`. The container itself holds no state and can be recreated at any time.

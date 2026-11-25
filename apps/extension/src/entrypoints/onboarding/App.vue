@@ -57,6 +57,8 @@ const accountId = ref('');
 
 /** Set up before on this browser (signed out or revoked): offer to sign in again. */
 const previous = ref<{ serverUrl: string; accountId: string } | undefined>();
+/** ACC-12: this profile has (or had) an account; another one would replace it here. */
+const existingServer = ref<string | undefined>();
 
 const strength = computed(() => account.estimateStrength(passphrase.value));
 const steps = computed<Step[]>(() =>
@@ -79,6 +81,7 @@ onMounted(async () => {
   if (state.status === 'disconnected') {
     previous.value = { serverUrl: state.account.serverUrl, accountId: state.account.accountId };
   }
+  existingServer.value = state.account?.serverUrl;
 });
 
 function start(chosen: Mode): void {
@@ -229,6 +232,9 @@ function closeTab(): void {
           <span>{{ t('onboardingConnectHelp') }}</span>
         </button>
       </div>
+      <p v-if="existingServer" class="muted hint replace-note">
+        {{ t('onboardingReplaceNote', [existingServer]) }}
+      </p>
     </section>
 
     <!-- Server -->
@@ -404,6 +410,10 @@ function closeTab(): void {
 .choice span {
   font-size: 0.875rem;
   opacity: 0.85;
+}
+
+.replace-note {
+  margin-block-start: 1rem;
 }
 
 .nav {
