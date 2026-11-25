@@ -214,6 +214,7 @@ From [SRS 6.5](<docs/srs/6. Other Requirements.md#65-known-limitations-and-open-
 - No sync for data without extension APIs: Firefox bookmark tags and keywords, tab group colours, passwords, settings.
 - Record sizes and timing aren't padded, so traffic analysis can reveal activity patterns.
 - Desktop only. Chrome and Edge on Android can't run the extension.
+- One account per browser profile (ACC-12). A server hosts many accounts; one browser profile connects to one of them. Several accounts in one browser means one profile each.
 - One server instance per `/data`, on local storage only (SQLite). No horizontal scaling and no high availability in 1.0 ([ADR-0007](docs/adr/0007-container-distribution.md)).
 - The browser's own address-bar autocomplete won't suggest pages visited only in other browsers (use `tz`) ([ADR-0005](docs/adr/0005-history-stored-in-extension.md)).
 - Open questions Q4–Q6 in SRS 6.5 are still to be decided (Q1–Q3 are decided).

@@ -578,5 +578,15 @@
   "tabsOpenFailed": {
     "message": "This browser can't open that address.",
     "description": "Shown when opening failed and copying failed too."
+  },
+  "onboardingReplaceNote": {
+    "message": "This browser profile is connected to an account on $SERVER$. Creating an account, or connecting to a different one, replaces it here: that account's synced data on this browser is removed (it stays on the server). To use both accounts, install Tazamun in a separate browser profile.",
+    "description": "Welcome page note when this browser profile already has an account (ACC-12).",
+    "placeholders": {
+      "server": {
+        "content": "$1",
+        "example": "https://sync.example.org"
+      }
+    }
   }
 }

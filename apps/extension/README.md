@@ -50,7 +50,7 @@ The flows come from `@tazamun/core` (`account`, `api`); `src/account/` adds the 
 | Account key | `storage.local` with *Remember the key on this device* on (the default), otherwise `storage.session`, which the browser clears when it closes; the extension is then *locked* until the passphrase is entered (SEC-5). |
 | Remember-key choice and modules | `storage.local` `settings` |
 
-The passphrase, the KEK and the auth key are never stored. The host permission is requested for the server's host only, when the user continues from the server step. A 401 from the server means the device was revoked: the extension drops the token and key and shows the revoked state.
+The passphrase, the KEK and the auth key are never stored. A browser profile holds one account (ACC-12); the welcome page warns before a profile that had an account is connected to another, and suggests a separate profile to keep both. The host permission is requested for the server's host only, when the user continues from the server step. A 401 from the server means the device was revoked: the extension drops the token and key and shows the revoked state.
 
 ## Sync engine
 
