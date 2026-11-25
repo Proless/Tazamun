@@ -47,7 +47,11 @@ afterEach(() => {
 describe('account storage (SEC-5, ACC-11)', () => {
   it('starts signed out, with the default settings (Q3: remember the key)', async () => {
     expect(await getAccountState(browser)).toEqual({ status: 'signed-out' });
-    expect(await getSettings(browser)).toEqual({ rememberKey: true, modules: { tabs: true } });
+    expect(await getSettings(browser)).toEqual({
+      rememberKey: true,
+      paused: false,
+      modules: { tabs: true },
+    });
   });
 
   it('remembers the key across a browser restart by default', async () => {

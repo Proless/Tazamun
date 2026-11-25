@@ -11,7 +11,7 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 ## Current status
 
 - **Phase:** P1 (engine, server, accounts, tabs). P0's exit criteria are met: workspace, tooling and CI are set up, and `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Q1 is decided: Hono and `node:sqlite`.
-- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `deploy/` (Dockerfile, Compose files, proxy examples; see [deploy/README.md](deploy/README.md)), `scripts/`, `docs/`, `.github/`. The image pipeline builds, smoke-tests and scans every PR and publishes `edge` from `main`. `apps/extension` has the WXT scaffold for three targets and onboarding: create or connect an account, recovery kit, lock, sign-out and revoked states (see [apps/extension/README.md](apps/extension/README.md)); `packages/core` has the API client and account flows they use. Next: the sync engine.
+- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `deploy/` (Dockerfile, Compose files, proxy examples; see [deploy/README.md](deploy/README.md)), `scripts/`, `docs/`, `.github/`. The image pipeline builds, smoke-tests and scans every PR and publishes `edge` from `main`. `apps/extension` has the WXT scaffold for three targets and onboarding: create or connect an account, recovery kit, lock, sign-out and revoked states (see [apps/extension/README.md](apps/extension/README.md)); `packages/core` has the API client and account flows they use. The sync engine runs in the extension's background (outbox and mirror in IndexedDB, alarm and popup pulls, backoff, status, pause), with no data-type module registered yet. Next: the tabs module.
 - The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
@@ -47,11 +47,11 @@ Folders marked *(planned)* don't exist yet.
 
 ```text
 apps/
-  extension/         WXT + Vue 3, Chrome/Edge/Firefox; engine in src/engine/, modules in src/modules/<type>/ (planned)
+  extension/         WXT + Vue 3, Chrome/Edge/Firefox; engine in src/engine/, modules in src/modules/<type>/
   server/            Node.js LTS + Hono + node:sqlite: HTTP API, config, migrations; serves the dashboard build from P3
   dashboard/         (planned, P3) Vue 3 + Vite SPA
 packages/
-  core/              HLC, schemas (zod), crypto, API client, account flows; merge functions from P1; no browser APIs
+  core/              HLC, schemas (zod), crypto, API client, account flows, merge functions; no browser APIs
   ui/                (planned) shared Vue 3 components
 data/                (planned, P5) extension-equivalents.json
 deploy/              see deploy/README.md
@@ -130,8 +130,8 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 - [x] **CI image pipeline:** build on every PR plus a container smoke test (health, API suite, SIGTERM, restart persistence); vulnerability scan; multi-arch with Buildx; publish `edge` and `sha-*` to GHCR from `main` with minimal token permissions (DEP-28…30, DEP-33, DEP-34, DEP-38).
 - [x] **Extension scaffold:** WXT with three targets. Fixed Firefox add-on ID. CSP with `'wasm-unsafe-eval'`. Permissions as in SRS 2.7.
 - [x] **Onboarding:** create or connect an account, recovery kit, device registration (ACC-1…8, ACC-11, UI-2).
-- [ ] **Engine:** outbox in IndexedDB, debounced push, alarm and popup-triggered pull, backoff, status, pause, per-module toggles (ENG-1…14).
-- [ ] **Module interface** plus an in-memory fake browser for tests.
+- [x] **Engine:** outbox in IndexedDB, debounced push, alarm and popup-triggered pull, backoff, status, pause, per-module toggles (ENG-1…14).
+- [x] **Module interface** plus an in-memory fake browser for tests. *(WXT's fake browser, plus `FakeServer` and `FakeTabsModule` in `apps/extension/src/engine/testing.ts`.)*
 - [ ] **Tabs module:** publish windows and tabs; incognito, scheme and exclusion filtering; strip favicons (TAB-1…6).
 - [ ] **Send tab** through the `commands` collection, plus notifications and the context menu (TAB-7, TAB-8, UI-4).
 - [ ] **Popup:** status, other devices' tabs, send tab (UI-1). **Options page:** basics (UI-3).
