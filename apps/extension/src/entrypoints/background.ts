@@ -52,6 +52,10 @@ export default defineBackground(() => {
       sync.localChange();
       return false;
     }
+    if (message.type === 'retire') {
+      void sync.retire(message.collection).then(sendResponse);
+      return true;
+    }
     if (message.type === 'send-tab') {
       const { target, url, title } = message;
       void sync

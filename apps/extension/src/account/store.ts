@@ -109,6 +109,14 @@ export async function saveSignedIn(
   await saveSettings(browser, { ...current, rememberKey });
 }
 
+/** ACC-7: the device name after a rename on the server. */
+export async function setDeviceName(browser: WxtBrowser, deviceName: string): Promise<void> {
+  const raw = (await browser.storage.local.get(ACCOUNT_KEY))[ACCOUNT_KEY];
+  const parsed = storedAccount.safeParse(raw);
+  if (!parsed.success) return;
+  await browser.storage.local.set({ [ACCOUNT_KEY]: { ...parsed.data, deviceName } });
+}
+
 /** Unlock (SEC-5): the passphrase gave the account key back. */
 export async function saveUnlockedKey(
   browser: WxtBrowser,

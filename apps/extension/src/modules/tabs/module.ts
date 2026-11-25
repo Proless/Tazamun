@@ -49,6 +49,14 @@ export class TabsModule implements SyncModule<schema.TabsData> {
     return merge.lastWriterWins(local, remote);
   }
 
+  /** PRIV-2: turning tabs off deletes this browser's tabs record from the server. */
+  async retire(ctx: DetectContext<schema.TabsData>): Promise<LocalChange<schema.TabsData>[]> {
+    const current = await ctx.mirror.get(ctx.deviceId);
+    return current === undefined || current.payload.deleted
+      ? []
+      : [{ id: ctx.deviceId, deleted: true }];
+  }
+
   /** Other devices' tabs are shown, never opened automatically (SRS 3.3). */
   apply(_records: SyncRecord<schema.TabsData>[]): Promise<void> {
     return Promise.resolve();

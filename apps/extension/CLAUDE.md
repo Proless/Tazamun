@@ -51,6 +51,11 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 - The popup must not load favicon URLs from tab records: that is a request to a third-party site (PRIV-4).
 - WXT's fake browser doesn't populate `windows.getAll` with tabs. Tests replace `fakeBrowser.windows.getAll` with their own windows.
 
+### Options page
+- Turning a module off asks first (PRIV-2): *Turn off and delete* sends a `retire` message; the engine asks the module's `retire()` for the deletions and publishes them even though the module is now skipped. The question is inline, not `window.confirm`, because it has three answers.
+- Revoking another device is possible here because the dashboard comes only in P3. Never offer it for this device; signing out is the way.
+- Renaming updates the server first, then the stored name and the device cache, so the context menu and notifications pick it up.
+
 ### Send tab (commands module)
 - Sending goes through the background (`send-tab` message, `BackgroundSync.sendTab`), which queues the command in `storage.local`. `detectLocalChanges` publishes queued commands and drops a queue entry only once the record is in the mirror (committed), so a crash publishes it again rather than losing it. Deletions after opening use the same pattern.
 - `apply` opens each command for this device at most once (`commandsDone`), because a page is applied again after a crash (REL-2). Never move the "done" write before the open: a crash would then lose the tab.

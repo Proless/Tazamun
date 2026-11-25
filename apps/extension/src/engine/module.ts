@@ -67,6 +67,11 @@ export interface SyncModule<Data> {
    * `detectLocalChanges` after `debounceMs` of quiet.
    */
   watch?(notify: () => void): void;
+  /**
+   * Optional (PRIV-2): the module is being turned off on this device and the user chose to delete
+   * this device's data for it from the server. Return the deletions; the engine publishes them.
+   */
+  retire?(ctx: DetectContext<Data>): Promise<LocalChange<Data>[]>;
   /** Debounce for this module's change events; default PUSH_DEBOUNCE_MS (ENG-4). */
   readonly debounceMs?: number;
 }
