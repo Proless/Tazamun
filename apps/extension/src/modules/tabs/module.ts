@@ -34,7 +34,10 @@ export class TabsModule implements SyncModule<schema.TabsData> {
       this.#browser.windows.getAll({ populate: true, windowTypes: ['normal'] }),
       getSettings(this.#browser),
     ]);
-    const data = buildTabsData(windows as BrowserWindow[], parseExclusions(settings.exclusions));
+    const data = buildTabsData(windows as BrowserWindow[], {
+      exclusions: parseExclusions(settings.exclusions),
+      includePrivate: settings.includePrivate.tabs,
+    });
     const current = await ctx.mirror.get(ctx.deviceId);
     if (current !== undefined && !current.payload.deleted) {
       if (merge.jsonEqual(current.payload.data, data)) return [];

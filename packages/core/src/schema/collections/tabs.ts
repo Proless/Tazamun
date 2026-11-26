@@ -25,6 +25,11 @@ export type Tab = z.infer<typeof tab>;
 
 export const tabWindow = z.looseObject({
   focused: z.boolean(),
+  /**
+   * A private or incognito window, published only when the user turned that on for this browser
+   * (TAB-2). Absent means a normal window; older clients ignore the field.
+   */
+  private: z.boolean().optional(),
   tabs: z.array(tab),
 });
 export type TabWindow = z.infer<typeof tabWindow>;

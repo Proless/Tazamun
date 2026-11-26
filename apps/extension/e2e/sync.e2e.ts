@@ -7,16 +7,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { findFirefox, launchChromium, launchFirefox, type Device } from './drivers.ts';
-import {
-  connectAccount,
-  createAccount,
-  openUrls,
-  popup,
-  recoverAccount,
-  sendFromPopup,
-  status,
-  waitFor,
-} from './flows.ts';
+import { connectAccount, createAccount, popup, recoverAccount, status, waitFor } from './flows.ts';
 import { TestServer, startSite } from './server.ts';
 
 let server: TestServer;
@@ -103,34 +94,19 @@ describe(`P1 end to end: Chromium A and ${bLabel}`, () => {
     );
   }, 180_000);
 
-  it('sends a tab from A to B and from B to A (TAB-7, PERF-2)', async () => {
-    await a.openWeb(`${site.url}/send-a-to-b`);
-    await sendFromPopup(a, `${site.url}/send-a-to-b`, bLabel);
-    // B opens it on its next sync; the popup triggers one, as the alarm would within 60 s.
-    const started = Date.now();
-    await waitFor(
-      async () => {
-        await (await popup(b)).close();
-        return openUrls(b);
-      },
-      (urls) => urls.some((u) => u.endsWith('/send-a-to-b')),
-      'the sent tab on B',
-      60_000,
-    );
-    expect(Date.now() - started).toBeLessThan(90_000);
-
-    await b.openWeb(`${site.url}/send-b-to-a`);
-    await sendFromPopup(b, `${site.url}/send-b-to-a`, 'Chromium A');
-    await waitFor(
-      async () => {
-        await (await popup(a)).close();
-        return openUrls(a);
-      },
-      (urls) => urls.some((u) => u.endsWith('/send-b-to-a')),
-      'the sent tab on A',
-      60_000,
-    );
-  }, 240_000);
+  it('shows a change on an open popup within 15 s (PERF-1)', async () => {
+    const page = await popup(b);
+    try {
+      await page.waitForText('Tabs on other browsers');
+      const started = Date.now();
+      await a.openWeb(`${site.url}/while-popup-open`);
+      // No reload: the open popup checks every few seconds by itself.
+      await page.waitForText('Page /while-popup-open', 20_000);
+      expect(Date.now() - started).toBeLessThan(15_000);
+    } finally {
+      await page.close();
+    }
+  }, 60_000);
 
   it('loses nothing when the server is killed and comes back (REL-3)', async () => {
     await server.kill();
@@ -212,7 +188,6 @@ describe(`P1 end to end: Chromium A and ${bLabel}`, () => {
   it('never logs URLs, titles, usernames or keys on the server (rule 5)', () => {
     expect(server.log).not.toContain('/from-a');
     expect(server.log).not.toContain('Page ');
-    expect(server.log).not.toContain('send-a-to-b');
     expect(server.log).not.toContain(USERNAME);
     expect(server.log).not.toContain(recoveryKey);
   });

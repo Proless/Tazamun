@@ -1,6 +1,6 @@
 # 0009. Device names in plaintext; the account key is remembered by default
 
-- Status: Accepted
+- Status: Accepted. The mentions of send tab are superseded by [0011](0011-private-browsing-choice-and-no-send-tab.md), which removed it.
 - Date: 2026-11-25
 
 ## Context

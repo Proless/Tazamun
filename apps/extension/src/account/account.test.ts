@@ -53,6 +53,8 @@ describe('account storage (SEC-5, ACC-11)', () => {
       paused: false,
       exclusions: [],
       modules: { tabs: true },
+      // PRIV-1: private windows stay out until the user says otherwise.
+      includePrivate: { tabs: false },
     });
   });
 

@@ -1,7 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { decodePayload, livePayload } from '../payload.ts';
-import { commands } from './commands.ts';
 import { extensions } from './extensions.ts';
 import { MAX_VISITS, history } from './history.ts';
 import { MAX_FAVICON_URL_LENGTH, tabs } from './tabs.ts';
@@ -71,27 +70,6 @@ describe('tabs', () => {
         expect(decode(tabs, data)).toEqual({ status: 'ok', payload });
       }),
     );
-  });
-});
-
-describe('commands', () => {
-  const open = {
-    target: 'dev-b',
-    sender: 'dev-a',
-    sentAt: T,
-    command: { type: 'open-tab', url: 'https://example.org/' },
-  };
-
-  it('accepts send-tab (TAB-7)', () => {
-    expect(decode(commands, open).status).toBe('ok');
-  });
-
-  it('rejects unknown command types, so they are kept but not executed', () => {
-    expect(decode(commands, { ...open, command: { type: 'close-tab' } }).status).toBe('invalid');
-  });
-
-  it('requires valid device IDs', () => {
-    expect(decode(commands, { ...open, target: 'not a device' }).status).toBe('invalid');
   });
 });
 
