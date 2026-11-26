@@ -3,51 +3,44 @@ import { account, api, crypto as tzCrypto } from '@tazamun/core';
 import { OnboardingError } from '../account/session.ts';
 import {
   errorKey,
-  parseServerStep,
-  validateAccountId,
+  parseServerInput,
   validateDeviceName,
   validateNewPassphrase,
+  validateRecoveryKey,
+  validateUsername,
 } from './form.ts';
 
-const ID = 'q4FIt0kT1zxqI0Z9Jq2cXw';
-
 describe('server step', () => {
-  it('takes a server URL on the create path', () => {
-    expect(parseServerStep('create', 'sync.example.org')).toEqual({
+  it('takes a server URL', () => {
+    expect(parseServerInput('sync.example.org')).toEqual({
       ok: true,
-      value: { serverUrl: 'https://sync.example.org' },
+      value: 'https://sync.example.org',
     });
-    expect(parseServerStep('create', 'http://sync.example.org')).toEqual({
+    expect(parseServerInput('http://sync.example.org')).toEqual({
       ok: false,
       error: 'errorServerUrlInsecure',
-    });
-  });
-
-  it('takes a pairing code or a URL on the connect path', () => {
-    expect(parseServerStep('connect', `tazamun:${ID}@https://a.example`)).toEqual({
-      ok: true,
-      value: { serverUrl: 'https://a.example', accountId: ID },
-    });
-    expect(parseServerStep('connect', 'https://a.example/')).toEqual({
-      ok: true,
-      value: { serverUrl: 'https://a.example' },
-    });
-    expect(parseServerStep('connect', 'tazamun:broken')).toEqual({
-      ok: false,
-      error: 'errorPairingInvalid',
     });
   });
 });
 
 describe('field validation', () => {
-  it('checks account IDs and device names', () => {
-    expect(validateAccountId(` ${ID} `)).toEqual({ ok: true, value: ID });
-    expect(validateAccountId('short').ok).toBe(false);
+  it('normalizes usernames and checks device names (ACC-7, ACC-13)', () => {
+    expect(validateUsername(' Hasan ')).toEqual({ ok: true, value: 'hasan' });
+    expect(validateUsername('ab')).toEqual({ ok: false, error: 'errorUsernameInvalid' });
     expect(validateDeviceName('  Firefox on Linux ')).toEqual({
       ok: true,
       value: 'Firefox on Linux',
     });
     expect(validateDeviceName('   ')).toEqual({ ok: false, error: 'errorDeviceNameEmpty' });
+  });
+
+  it('checks the shape of a typed recovery key (ACC-5)', () => {
+    const key = tzCrypto.formatRecoveryKey(tzCrypto.generateRecoveryKey());
+    expect(validateRecoveryKey(key.toLowerCase()).ok).toBe(true);
+    expect(validateRecoveryKey('ABCD-EFGH')).toEqual({
+      ok: false,
+      error: 'errorRecoveryKeyFormat',
+    });
   });
 
   it('enforces ACC-4 before an account is created', () => {
@@ -64,6 +57,9 @@ describe('field validation', () => {
 describe('errorKey', () => {
   const cases: [unknown, string][] = [
     [new api.ApiError(401, 'INVALID_CREDENTIALS', 'x'), 'errorInvalidCredentials'],
+    [new api.ApiError(409, 'USERNAME_TAKEN', 'x'), 'errorUsernameTaken'],
+    [new account.UsernameError(), 'errorUsernameInvalid'],
+    [new tzCrypto.RecoveryKeyFormatError(), 'errorRecoveryKeyFormat'],
     [new api.ApiError(403, 'INVITE_REQUIRED', 'x'), 'errorInviteRequired'],
     [new api.ApiError(403, 'INVITE_INVALID', 'x'), 'errorInviteInvalid'],
     [new api.ApiError(403, 'REGISTRATION_CLOSED', 'x'), 'errorRegistrationClosed'],
@@ -82,5 +78,11 @@ describe('errorKey', () => {
   ];
   it.each(cases)('%s → %s', (err, key) => {
     expect(errorKey(err)).toBe(key);
+  });
+
+  it('reads wrong credentials during recovery as a wrong recovery key', () => {
+    const err = new api.ApiError(401, 'INVALID_CREDENTIALS', 'x');
+    expect(errorKey(err, 'recover')).toBe('errorRecoveryInvalid');
+    expect(errorKey(err, 'connect')).toBe('errorInvalidCredentials');
   });
 });

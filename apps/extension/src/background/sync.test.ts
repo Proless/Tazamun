@@ -24,6 +24,7 @@ beforeEach(async () => {
     {
       serverUrl: 'https://sync.example.org',
       accountId: tzCrypto.randomId(),
+      username: 'hasan',
       deviceId: 'dev_A',
       deviceName: 'Test',
       token: tzCrypto.toBase64Url(tzCrypto.randomBytes(32)),

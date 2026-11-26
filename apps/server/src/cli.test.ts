@@ -163,7 +163,9 @@ describe('invite (ADM-2)', () => {
     const hash = tokenHash(token ?? '');
     expect(t.withDb((db) => db.createAccount(account, NOW, hash))).toBe('created');
     expect(
-      t.withDb((db) => db.createAccount({ ...account, id: tzCrypto.randomId(), username: 'second' }, NOW, hash)),
+      t.withDb((db) =>
+        db.createAccount({ ...account, id: tzCrypto.randomId(), username: 'second' }, NOW, hash),
+      ),
     ).toBe('invite-invalid');
   });
 

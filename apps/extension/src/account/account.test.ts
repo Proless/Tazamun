@@ -3,7 +3,7 @@ import { browser } from 'wxt/browser';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { crypto as tzCrypto } from '@tazamun/core';
 import { detectBrowser, osDisplayName } from './device.ts';
-import { recoveryKit, recoveryKitText } from './recovery-kit.ts';
+import { recoveryKeyText } from './recovery-key.ts';
 import { refreshAccountState, signOut } from './session.ts';
 import {
   forgetAccount,
@@ -20,6 +20,7 @@ function signInResult(): SignInResult {
   return {
     serverUrl: 'https://sync.example.org',
     accountId: tzCrypto.randomId(),
+    username: 'hasan',
     deviceId: tzCrypto.randomId(),
     deviceName: 'Firefox on Linux',
     token: tzCrypto.toBase64Url(tzCrypto.randomBytes(32)),
@@ -196,15 +197,18 @@ describe('device identity (ACC-7)', () => {
   });
 });
 
-describe('recovery kit (ACC-5)', () => {
-  it('holds the server, account ID and pairing code, and no secrets', () => {
+describe('recovery key document (ACC-5)', () => {
+  it('holds the server, username and recovery key', () => {
     fakeBrowser.i18n.getMessage = (key: string) => `[${key}]`;
-    const accountId = tzCrypto.randomId();
-    const kit = recoveryKit('https://sync.example.org', accountId);
-    const text = recoveryKitText(kit, new Date('2026-11-25T12:00:00Z'));
+    const recoveryKey = tzCrypto.formatRecoveryKey(tzCrypto.generateRecoveryKey());
+    const text = recoveryKeyText(
+      { serverUrl: 'https://sync.example.org', username: 'hasan', recoveryKey },
+      new Date('2026-11-25T12:00:00Z'),
+    );
     expect(text).toContain('https://sync.example.org');
-    expect(text).toContain(accountId);
-    expect(text).toContain(`tazamun:${accountId}@https://sync.example.org`);
+    expect(text).toContain('hasan');
+    expect(text).toContain(recoveryKey);
     expect(text).toContain('2026-11-25');
+    expect(text).toContain('[recoveryDocKeepSafe]');
   });
 });

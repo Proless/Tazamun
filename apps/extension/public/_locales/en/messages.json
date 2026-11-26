@@ -61,10 +61,6 @@
     "message": "Server",
     "description": "Label for the server URL."
   },
-  "optionsAccountId": {
-    "message": "Account ID",
-    "description": "Label for the account ID."
-  },
   "optionsRememberKey": {
     "message": "Remember the key on this device",
     "description": "Checkbox: keep the account key after the browser closes."
@@ -86,7 +82,7 @@
     "description": "Options page text after the user signed out."
   },
   "optionsRevoked": {
-    "message": "This browser was removed from your account on another device, so it stopped syncing. Your local data is still here.",
+    "message": "This browser was signed out from another device: it was removed from your account, or the passphrase was changed. It stopped syncing; your local data is still here.",
     "description": "Options page text after the device was revoked elsewhere."
   },
   "optionsSignInAgain": {
@@ -98,7 +94,7 @@
     "description": "Button: forget server URL, account ID and device ID on this browser."
   },
   "optionsForgetConfirm": {
-    "message": "Remove the account from this browser? Your data on the server stays, and you can connect again with the recovery kit and your passphrase.",
+    "message": "Remove the account from this browser? Your data on the server stays, and you can sign in again with your username and passphrase.",
     "description": "Confirmation before forgetting the account on this browser."
   },
   "optionsNotConnected": {
@@ -116,58 +112,6 @@
   "unlockWrongPassphrase": {
     "message": "That passphrase doesn't open this account.",
     "description": "Error after unlocking with a wrong passphrase."
-  },
-  "kitDownload": {
-    "message": "Download recovery kit",
-    "description": "Button: download the recovery kit as a text file."
-  },
-  "kitPrint": {
-    "message": "Print",
-    "description": "Button: print the recovery kit."
-  },
-  "kitCopyPairing": {
-    "message": "Copy pairing code",
-    "description": "Button: copy the pairing code to the clipboard."
-  },
-  "kitCopied": {
-    "message": "Copied.",
-    "description": "Shown after copying the pairing code."
-  },
-  "kitHeading": {
-    "message": "Tazamun recovery kit",
-    "description": "First line of the recovery kit."
-  },
-  "kitServer": {
-    "message": "Server",
-    "description": "Recovery kit label for the server URL."
-  },
-  "kitAccountId": {
-    "message": "Account ID",
-    "description": "Recovery kit label for the account ID."
-  },
-  "kitPairingCode": {
-    "message": "Pairing code",
-    "description": "Recovery kit label for the pairing code."
-  },
-  "kitCreated": {
-    "message": "Created",
-    "description": "Recovery kit label for the date it was made."
-  },
-  "kitPassphraseNotIncluded": {
-    "message": "Your passphrase is not in this kit. Keep it somewhere safe, separately.",
-    "description": "Recovery kit note."
-  },
-  "kitLostPassphrase": {
-    "message": "Without the passphrase nobody can open your data, not even the server's operator. A lost passphrase means lost data.",
-    "description": "Recovery kit warning (ACC-4)."
-  },
-  "kitHowToConnect": {
-    "message": "To connect another browser: install Tazamun, choose “Connect to an existing account”, paste the pairing code, then enter your passphrase.",
-    "description": "Recovery kit instructions."
-  },
-  "kitLead": {
-    "message": "Save this recovery kit. With it and your passphrase you can connect any browser to your account.",
-    "description": "Onboarding text above the recovery kit."
   },
   "deviceDefaultName": {
     "message": "$BROWSER$ on $OS$",
@@ -200,7 +144,7 @@
     "description": "Hint under the create button."
   },
   "onboardingConnect": {
-    "message": "Connect to an existing account",
+    "message": "Sign in to an existing account",
     "description": "Button: connect this browser to an account made elsewhere."
   },
   "onboardingConnectHelp": {
@@ -251,14 +195,6 @@
     "message": "Server address",
     "description": "Label of the server URL field."
   },
-  "serverOrPairingLabel": {
-    "message": "Pairing code or server address",
-    "description": "Label of the field on the connect path."
-  },
-  "serverOrPairingHelp": {
-    "message": "The pairing code is in the recovery kit and in Tazamun's settings on your other browser.",
-    "description": "Hint under the pairing code field."
-  },
   "serverPermissionNote": {
     "message": "Your browser will ask to let Tazamun talk to this server. Tazamun contacts no other site.",
     "description": "Note before the host permission prompt."
@@ -300,7 +236,7 @@
     "description": "Heading of the passphrase step when creating."
   },
   "passphraseLead": {
-    "message": "Your passphrase encrypts everything. It never leaves this browser, and nobody can reset it, not even the server's operator.",
+    "message": "Your passphrase encrypts everything. It never leaves this browser, and the server’s operator can’t reset it. After this step you get a recovery key, the only other way in.",
     "description": "Text on the passphrase step."
   },
   "passphraseLabel": {
@@ -336,7 +272,7 @@
     "description": "Strength estimate."
   },
   "passphraseAcknowledge": {
-    "message": "I understand that if I lose my passphrase, my synced data is lost. There is no reset.",
+    "message": "I understand that if I lose both my passphrase and my recovery key, my synced data is lost. Nobody can reset them.",
     "description": "Checkbox the user must tick before creating the account (ACC-4)."
   },
   "inviteLabel": {
@@ -355,10 +291,6 @@
     "message": "Sign in",
     "description": "Heading of the passphrase step when connecting."
   },
-  "accountIdLabel": {
-    "message": "Account ID",
-    "description": "Label of the account ID field."
-  },
   "signInButton": {
     "message": "Connect",
     "description": "Button that signs in to an existing account."
@@ -372,7 +304,7 @@
     "description": "Heading of the last onboarding step."
   },
   "doneLead": {
-    "message": "Tazamun's toolbar button shows its status. To add another browser, install Tazamun there and use the pairing code from your recovery kit.",
+    "message": "Tazamun’s toolbar button shows its status. To add another browser, install Tazamun there and sign in with your server address, username and passphrase.",
     "description": "Text of the last onboarding step."
   },
   "doneClose": {
@@ -390,10 +322,6 @@
   "errorServerUrlExtra": {
     "message": "Enter the server address only, without a user name, query or #.",
     "description": "Error: URL with credentials, query or fragment."
-  },
-  "errorPairingInvalid": {
-    "message": "That pairing code isn't valid. Copy it again from the recovery kit or the other browser.",
-    "description": "Error: malformed pairing code."
   },
   "errorPermissionDenied": {
     "message": "Tazamun needs permission to talk to the server. Try again and choose Allow.",
@@ -432,15 +360,11 @@
     "description": "Error: confirmation differs."
   },
   "errorAcknowledge": {
-    "message": "Please confirm that you understand a lost passphrase can't be recovered.",
+    "message": "Please confirm that you understand a lost passphrase and recovery key can’t be replaced.",
     "description": "Error: checkbox not ticked."
   },
-  "errorAccountIdInvalid": {
-    "message": "That account ID isn't valid. It has 22 characters and is in the recovery kit.",
-    "description": "Error: malformed account ID."
-  },
   "errorInvalidCredentials": {
-    "message": "The account ID or passphrase is wrong.",
+    "message": "The username or passphrase is wrong.",
     "description": "Error: sign-in refused (deliberately doesn't say which)."
   },
   "errorRateLimited": {
@@ -744,5 +668,153 @@
   "devicesUnavailable": {
     "message": "The device list can't be loaded right now.",
     "description": "Shown when offline with no cached list."
+  },
+  "usernameLabel": {
+    "message": "Username",
+    "description": "Label of the username field (sign-up, sign-in, recovery, options), and the username line of the recovery key document."
+  },
+  "usernameHelp": {
+    "message": "3 to 32 characters: letters, digits, dots, dashes or underscores. You sign in with it on your other browsers; the server’s operator can see it.",
+    "description": "Help below the username field when creating an account."
+  },
+  "errorUsernameInvalid": {
+    "message": "A username has 3 to 32 characters: letters a–z, digits, dots, dashes or underscores, and starts and ends with a letter or digit.",
+    "description": "Error: the username has the wrong form."
+  },
+  "errorUsernameTaken": {
+    "message": "That username is already taken on this server. Choose another one.",
+    "description": "Error: another account on the server has this username."
+  },
+  "recoveryHeading": {
+    "message": "Your recovery key",
+    "description": "Heading of the onboarding step that shows the new recovery key."
+  },
+  "recoveryLead": {
+    "message": "If you ever forget your passphrase, this key lets you set a new one. Save it now: it is shown only once. Keep it as safe as your passphrase, because together with your username it opens your account.",
+    "description": "Text above the new recovery key."
+  },
+  "recoverySaved": {
+    "message": "I have saved my recovery key.",
+    "description": "Checkbox the user ticks before leaving the recovery key step."
+  },
+  "errorRecoverySaved": {
+    "message": "Save the recovery key first (download, print or copy it), then tick the box.",
+    "description": "Error: the user tried to continue without confirming the recovery key is saved."
+  },
+  "recoveryKeyLabel": {
+    "message": "Recovery key",
+    "description": "Label of the recovery key field, and the key line of the recovery key document."
+  },
+  "recoveryDownload": {
+    "message": "Download",
+    "description": "Button: download the recovery key as a text file."
+  },
+  "recoveryPrint": {
+    "message": "Print",
+    "description": "Button: print the recovery key."
+  },
+  "recoveryCopy": {
+    "message": "Copy",
+    "description": "Button: copy the recovery key to the clipboard."
+  },
+  "recoveryCopied": {
+    "message": "Copied.",
+    "description": "Shown after the recovery key was copied."
+  },
+  "recoveryDocHeading": {
+    "message": "Tazamun recovery key",
+    "description": "Heading of the downloaded or printed recovery key document."
+  },
+  "recoveryDocServer": {
+    "message": "Server",
+    "description": "Server line of the recovery key document."
+  },
+  "recoveryDocCreated": {
+    "message": "Created",
+    "description": "Date line of the recovery key document."
+  },
+  "recoveryDocKeepSafe": {
+    "message": "Keep this key as safe as your passphrase: with your username it opens your account. Anyone who finds it can read your synced data.",
+    "description": "Warning in the recovery key document."
+  },
+  "recoveryDocHowTo": {
+    "message": "Forgot your passphrase? Install Tazamun, choose “Sign in to an existing account”, enter the server and your username, then “Forgot your passphrase?”, and enter this key to set a new passphrase.",
+    "description": "How to use the recovery key, in the document."
+  },
+  "forgotPassphrase": {
+    "message": "Forgot your passphrase?",
+    "description": "Link on the sign-in step that switches to recovery with the recovery key."
+  },
+  "recoverHeading": {
+    "message": "Set a new passphrase",
+    "description": "Heading of the recovery step."
+  },
+  "recoverLead": {
+    "message": "Enter your recovery key and choose a new passphrase. Your other browsers are signed out and sign in again with the new passphrase. The recovery key keeps working.",
+    "description": "Text on the recovery step."
+  },
+  "recoverButton": {
+    "message": "Set new passphrase",
+    "description": "Submit button on the recovery step."
+  },
+  "newPassphraseLabel": {
+    "message": "New passphrase",
+    "description": "Label of the new passphrase field on the recovery step."
+  },
+  "backToSignIn": {
+    "message": "I remember my passphrase",
+    "description": "Link on the recovery step back to normal sign-in."
+  },
+  "errorRecoveryKeyFormat": {
+    "message": "A recovery key has 32 letters and digits, in 8 groups of 4.",
+    "description": "Error: the typed recovery key has the wrong form."
+  },
+  "errorRecoveryInvalid": {
+    "message": "The username or recovery key is wrong.",
+    "description": "Error: the server refused the recovery key."
+  },
+  "optionsUsername": {
+    "message": "Username",
+    "description": "Options: label of the username row."
+  },
+  "optionsUsernameMissing": {
+    "message": "This account has no username yet. Choose one: without it, you can’t sign in on another browser.",
+    "description": "Options: shown for accounts created before usernames existed."
+  },
+  "optionsUsernameSave": {
+    "message": "Save username",
+    "description": "Options: button to set or change the username."
+  },
+  "optionsUsernameHelp": {
+    "message": "Your other browsers stay signed in. Use the new username the next time you sign in.",
+    "description": "Options: help below the username field."
+  },
+  "optionsRecoveryHeading": {
+    "message": "Recovery key",
+    "description": "Options: heading of the recovery key section."
+  },
+  "optionsRecoverySet": {
+    "message": "A recovery key is set. If you lost it, make a new one: the old one stops working.",
+    "description": "Options: the account has a recovery key."
+  },
+  "optionsRecoveryMissing": {
+    "message": "This account has no recovery key. Without one, a forgotten passphrase means lost data. Make one now.",
+    "description": "Options: the account has no recovery key."
+  },
+  "optionsRecoveryNew": {
+    "message": "Make a new recovery key",
+    "description": "Options: button that creates a new recovery key."
+  },
+  "optionsRecoveryPassphrase": {
+    "message": "Enter your passphrase to make a new recovery key.",
+    "description": "Options: prompt above the passphrase field when making a new recovery key."
+  },
+  "optionsRecoveryLocked": {
+    "message": "Unlock this browser first.",
+    "description": "Options: a new recovery key needs the account key, which a locked browser doesn’t have."
+  },
+  "optionsRecoveryShown": {
+    "message": "Save this key now. It is shown only once, and the previous one no longer works.",
+    "description": "Options: shown with a newly made recovery key."
   }
 }

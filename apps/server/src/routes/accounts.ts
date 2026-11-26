@@ -28,11 +28,10 @@ function verifyRecovery(
   const account = s.db.getAccountByUsername(username);
   // Per account too, so spreading guesses over many IPs doesn't help (SEC-9).
   rateLimit(s.limiters.auth, `recovery-account:${account?.id ?? username}`);
-  const recovery = account?.recovery;
-  if (!verifyAuthKey(recoveryAuthKey, recovery?.authHash) || recovery === undefined) {
-    throw invalidCredentials();
-  }
-  return { account: account as AccountRow, recovery };
+  // Always compare, so timing doesn't reveal whether the username exists.
+  const valid = verifyAuthKey(recoveryAuthKey, account?.recovery?.authHash);
+  if (!valid || account?.recovery === undefined) throw invalidCredentials();
+  return { account, recovery: account.recovery };
 }
 
 export function accountRoutes(app: Hono<AppEnv>, s: Services): void {

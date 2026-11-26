@@ -21,7 +21,10 @@ function withAccount(db: Database, id = 'acct'): string {
   db.createAccount(
     {
       id,
-      username: id.toLowerCase().replace(/[^a-z0-9]/g, '0').padEnd(3, '0'),
+      username: id
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '0')
+        .padEnd(3, '0'),
       salt: 'salt',
       kdfParams: { ...tzCrypto.DEFAULT_KDF_PARAMS },
       authHash: new Uint8Array(32),
