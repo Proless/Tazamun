@@ -20,8 +20,6 @@ export const tab = z.looseObject({
   pinned: z.boolean(),
   active: z.boolean(),
   lastAccessed: epochMs.optional(),
-  /** Tab group title, where the browser supports groups. */
-  groupTitle: z.string().optional(),
   favIconUrl: favIconUrl.optional(),
 });
 export type Tab = z.infer<typeof tab>;

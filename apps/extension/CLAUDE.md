@@ -92,7 +92,7 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 - Firefox refuses `tabs.create` for privileged URLs (`about:config` and others) and restricts `file:`. Fall back to copying the URL (TAB-8).
 - Firefox's `management.getAll()` returns add-on IDs, not store slugs.
 - Chrome's `history.addUrl` can't set title or time. That's one reason history isn't written back ([ADR-0005](../../docs/adr/0005-history-stored-in-extension.md)).
-- Tab group APIs differ.
+- Tab groups aren't synced (TAB-1). Don't add the `tabGroups` permission for them; the APIs differ between Chromium and Firefox.
 - Test **every** change on Firefox too. The Chromium end-to-end setup is easier to automate, so Firefox regressions slip through.
 
 ### Store publishing

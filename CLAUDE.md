@@ -201,7 +201,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 
 ### After 1.0 (backlog, in rough priority order)
 
-Firefox for Android · Helm chart · push notifications instead of polling · key rotation · tab groups · reading list / saved-for-later · WebDAV or S3 storage backends (Q6) · Arabic translation (right-to-left) · padding records to hide sizes · signed record history (detect rollbacks) · Safari (only if its extension APIs allow it).
+Firefox for Android · Helm chart · push notifications instead of polling · key rotation · reading list / saved-for-later · WebDAV or S3 storage backends (Q6) · Arabic translation (right-to-left) · padding records to hide sizes · signed record history (detect rollbacks) · Safari (only if its extension APIs allow it).
 
 ---
 
@@ -212,7 +212,7 @@ From [SRS 6.5](<docs/srs/6. Other Requirements.md#65-known-limitations-and-open-
 - Losing both the passphrase and the recovery key, with no signed-in device, means lost data. No server-side recovery is possible by design ([ADR-0010](docs/adr/0010-usernames-and-recovery-key.md)).
 - A malicious server can withhold or roll back records, and can serve a backdoored dashboard.
 - Account-key rotation is manual (export, new account, import).
-- No sync for data without extension APIs: Firefox bookmark tags and keywords, tab group colours, passwords, settings.
+- No sync for data without extension APIs: Firefox bookmark tags and keywords, passwords, settings. Tab groups aren't synced at all, by choice (TAB-1).
 - Record sizes and timing aren't padded, so traffic analysis can reveal activity patterns.
 - Desktop only. Chrome and Edge on Android can't run the extension.
 - One account per browser profile (ACC-12). A server hosts many accounts; one browser profile connects to one of them. Several accounts in one browser means one profile each.
