@@ -1,6 +1,6 @@
 /**
- * From the browser's windows to the `tabs` record data (TAB-1…4), as a pure function so every
- * filtering rule is unit-tested.
+ * From the browser's windows to the `tabs` record data (TAB-1…4, TAB-10), as pure functions so
+ * every filtering rule is unit-tested.
  */
 import { schema } from '@tazamun/core';
 import { isSyncableUrl, type Exclusion } from '../../lib/exclusions.ts';
@@ -75,4 +75,45 @@ export function buildTabsData(
     }
   }
   return { windows: result };
+}
+
+/**
+ * TAB-10: carry the recently closed list forward. Tabs open in `previous` (this device's last
+ * record) but not in `live` were closed since: they go to the front with `closedAt = now`. A URL
+ * that is open again leaves the list, each URL appears once (the newest), entries older than
+ * seven days drop out, and at most RECENT_TABS_MAX are kept. `keep` applies the same rules as for
+ * open tabs (exclusions, schemes, private windows), so a site excluded later disappears here too.
+ *
+ * Closing the last window, or every tab, therefore moves them all here instead of erasing them.
+ */
+export function withRecent(
+  live: schema.TabsData,
+  previous: schema.TabsData | undefined,
+  now: number,
+  keep: (entry: schema.RecentTab) => boolean,
+): schema.TabsData {
+  const open = new Set(live.windows.flatMap((w) => w.tabs.map((t) => t.url)));
+  const closed: schema.RecentTab[] = [];
+  for (const window of previous?.windows ?? []) {
+    for (const tab of window.tabs) {
+      if (open.has(tab.url)) continue;
+      closed.push({
+        url: tab.url,
+        title: tab.title,
+        closedAt: now,
+        ...(window.private === true ? { private: true } : {}),
+      });
+    }
+  }
+  const oldest = now - schema.RECENT_TABS_MAX_AGE_MS;
+  const seen = new Set<string>();
+  const recent: schema.RecentTab[] = [];
+  for (const entry of [...closed, ...(previous?.recent ?? [])]) {
+    if (open.has(entry.url) || seen.has(entry.url)) continue;
+    if (entry.closedAt < oldest || !keep(entry)) continue;
+    seen.add(entry.url);
+    recent.push(entry);
+    if (recent.length === schema.RECENT_TABS_MAX) break;
+  }
+  return recent.length === 0 ? live : { ...live, recent };
 }

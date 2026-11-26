@@ -108,6 +108,30 @@ describe(`P1 end to end: Chromium A and ${bLabel}`, () => {
     }
   }, 60_000);
 
+  it('lists a tab closed on A as recently closed on B (TAB-10)', async () => {
+    await a.ext(`api.tabs.query({}).then(async (ts) => {
+      const t = ts.find((x) => (x.url || '').endsWith('/while-popup-open'));
+      await api.tabs.remove(t.id);
+      return true;
+    })`);
+    await waitFor(
+      () => otherTabsText(b),
+      (t) => /Recently closed \(\d+\)/.test(t),
+      'the closed tab on B',
+      60_000,
+    );
+    const page = await popup(b);
+    try {
+      await page.waitForText('Recently closed');
+      await page.eval(
+        `(() => { document.querySelectorAll('details.recent').forEach((d) => { d.open = true; }); return true; })()`,
+      );
+      await page.waitForText('Page /while-popup-open');
+    } finally {
+      await page.close();
+    }
+  }, 120_000);
+
   it('loses nothing when the server is killed and comes back (REL-3)', async () => {
     await server.kill();
     await a.openWeb(`${site.url}/while-server-down`);

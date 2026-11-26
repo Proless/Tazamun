@@ -6,13 +6,23 @@
 import type { schema } from '@tazamun/core';
 import type { SyncRecord } from '../../engine/module.ts';
 
+/** TAB-11: a device not seen for longer than this shows its tabs as "open when last seen". */
+export const LIVE_WITHIN_MS = 10 * 60 * 1000;
+
 export interface DeviceTabs {
   readonly deviceId: string;
   /** Undefined when the device list hasn't been fetched yet (offline). */
   readonly name: string | undefined;
   readonly lastSeenAt: number | undefined;
+  /**
+   * TAB-11: seen within LIVE_WITHIN_MS, so `windows` is what is open there now. False: what was
+   * open when it was last seen. Undefined when the last-seen time isn't known.
+   */
+  readonly live: boolean | undefined;
   readonly windows: readonly schema.TabWindow[];
   readonly tabCount: number;
+  /** TAB-10: recently closed tabs, newest first. */
+  readonly recent: readonly schema.RecentTab[];
 }
 
 /**
@@ -24,6 +34,7 @@ export function otherDevicesTabs(
   records: readonly SyncRecord<schema.TabsData>[],
   devices: readonly schema.Device[] | undefined,
   selfId: string,
+  now: number,
 ): DeviceTabs[] {
   const byId = new Map(devices?.map((d) => [d.id, d]));
   const result: DeviceTabs[] = [];
@@ -33,13 +44,17 @@ export function otherDevicesTabs(
     if (devices !== undefined && device === undefined) continue;
     const windows = record.payload.data.windows.filter((w) => w.tabs.length > 0);
     const tabCount = windows.reduce((n, w) => n + w.tabs.length, 0);
-    if (tabCount === 0) continue;
+    const recent = record.payload.data.recent ?? [];
+    if (tabCount === 0 && recent.length === 0) continue;
+    const lastSeenAt = device === undefined ? undefined : Date.parse(device.lastSeenAt);
     result.push({
       deviceId: record.id,
       name: device?.name,
-      lastSeenAt: device === undefined ? undefined : Date.parse(device.lastSeenAt),
+      lastSeenAt,
+      live: lastSeenAt === undefined ? undefined : now - lastSeenAt <= LIVE_WITHIN_MS,
       windows,
       tabCount,
+      recent,
     });
   }
   return result.sort((a, b) => (b.lastSeenAt ?? 0) - (a.lastSeenAt ?? 0));
