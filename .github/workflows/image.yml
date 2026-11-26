@@ -29,7 +29,10 @@ env:
 jobs:
   test:
     name: Build and smoke-test (${{ matrix.arch }})
-    runs-on: ubuntu-latest
+    # DEP-33: each architecture builds and runs on its own native runner (`ubuntu-24.04-arm` is free
+    # for public repositories). Under QEMU, the emulator's own memory counted against the smoke
+    # test's 256 MB limit, and arm64 runs were OOM-killed (exit 137) at random.
+    runs-on: ${{ matrix.runner }}
     # DEP-38: `upload-sarif` needs `security-events: write` to send the scan to code scanning.
     # Without it, pushes to main fail with "Resource not accessible by integration" and `edge` isn't
     # published. Fork PRs still get a read-only token and skip the upload (see "Scan (SARIF)").
@@ -39,7 +42,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -50,10 +57,6 @@ jobs:
       # The smoke test runs on the runner and uses @tazamun/core as a client would.
       - run: pnpm install --frozen-lockfile
 
-      # arm64 runs under QEMU. The Dockerfile's build stage runs on the runner's own platform,
-      # so only the runtime stage and the container itself are emulated.
-      - if: matrix.arch == 'arm64'
-        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Build
