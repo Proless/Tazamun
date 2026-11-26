@@ -1,6 +1,6 @@
 # 0012. Firefox for Android is a 1.0 target, as a partial device
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-26
 
 ## Context
@@ -14,7 +14,9 @@ Firefox for Android runs WebExtensions, but not all of them. According to Mozill
 - **Different:** the toolbar popup opens as an overlay that covers the page. Android kills idle processes, extension background scripts included, so extensions have to recover after being killed. Event pages are the recommended background.
 - **Storage:** `local` and `session` are supported.
 
-Some facts still need checking before the requirements depend on them. These go in the first implementation task, not this ADR: the exact `tabs` events and their behaviour, `alarms` while Firefox is in the background, `action.setBadgeText`, `management`, optional permissions and optional host permissions, `extension.isAllowedIncognitoAccess` and private tabs, and the minimum Firefox for Android version. One more fact also needs checking: `web-ext lint` reports that Firefox for Android doesn't support the `data_collection_permissions` manifest key, which AMO requires for new add-ons (SRS 6.2).
+Some facts still need checking before the requirements depend on them. These go in the first implementation task, not this ADR: the exact `tabs` events and their behaviour, `alarms` while Firefox is in the background, `action.setBadgeText`, `management`, optional permissions and optional host permissions, `extension.isAllowedIncognitoAccess` and private tabs.
+
+**Data-collection consent.** AMO requires new add-ons to declare `data_collection_permissions` (SRS 6.2), and `web-ext lint` warns that Firefox for Android can't use the key. According to Mozilla's [built-in consent](https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/) page, the key is supported on desktop from Firefox 140 and on Android from Firefox 142 ([bug 1964999](https://bugzilla.mozilla.org/show_bug.cgi?id=1964999) added the Android prompt). The warning appears because the manifest doesn't set a minimum Android version, so lint checks it against Android versions older than 142.
 
 Two parts of Tazamun don't depend on those APIs:
 
@@ -23,7 +25,7 @@ Two parts of Tazamun don't depend on those APIs:
 
 ## Decision
 
-1. **Firefox for Android is a supported browser in 1.0** (MOB-1). It uses the same Firefox build and add-on ID as desktop. The manifest adds `browser_specific_settings.gecko_android` with a minimum version. There is no fourth build target unless the spike finds a manifest difference that one package can't hold.
+1. **Firefox for Android is a supported browser in 1.0** (MOB-1). It uses the same Firefox build, add-on ID and data-collection declaration as desktop. The manifest adds `browser_specific_settings.gecko_android.strict_min_version: "142.0"`, the first Android version with the consent prompt. Desktop stays at 140. With that, `web-ext lint` passes, and one AMO package covers both. There is no fourth build target and no Android-only manifest.
 2. **It is a partial device.** What it can do on Android:
 
    | Data type | On Firefox for Android |
@@ -38,15 +40,15 @@ Two parts of Tazamun don't depend on those APIs:
 5. **Crypto parameters don't change for phones.** SEC-1 stays at m = 64 MiB, t = 3, p = 1, and clients still refuse lower values. Phones get a time budget for key derivation instead (MOB-8). Key derivation runs at sign-in, recovery and unlock, not on every sync, and the key is remembered by default ([ADR-0009](0009-device-names-and-key-storage.md)). If a reference phone misses the budget, the fix is a faster implementation or a clearer progress screen, never weaker parameters for everyone.
 6. **Sync on Android is best effort while Firefox is in the background.** PERF-1's 90 s applies only while Firefox is in the foreground. Opening the popup or bringing Firefox to the front triggers a pull. REL-3 (nothing lost if sync is interrupted) applies without exception, because Android killing the process is the normal case there, not a failure (MOB-9).
 7. **The extension's pages work on a phone.** The popup, options page and onboarding work at 360 px wide and by touch. They don't depend on hover, keyboard shortcuts or the toolbar badge, because status shows in the popup (MOB-7).
-8. **Work starts in P2.** Android work runs alongside the desktop modules, not after them, so it is never a 1.0 blocker found late. The first task is a short spike on a real phone that settles the facts listed above and updates this ADR and the SRS (MOB-10). P1's exit criteria are unchanged. Store work is part of P6.
+8. **Work starts in P2.** Android work runs alongside the desktop modules, not after them, so it is never a 1.0 blocker found late. The first task is a short spike on a real phone that settles the facts listed above and records them in the SRS (MOB-10). The spike's first step is to upload an unlisted test version with the Android minimum to AMO and confirm it's accepted and installs on Android. P1's exit criteria are unchanged. Store work is part of P6.
 
 ## Consequences
 
-- 1.0 covers four browsers instead of three, and every later module states what it does on Android. The status changes from Proposed to Accepted once the spike confirms the facts this decision relies on.
+- 1.0 covers four browsers instead of three, and every later module states what it does on Android. If the spike contradicts a fact this decision relies on, a new ADR supersedes the affected part; this one isn't rewritten.
+- Users on Firefox for Android older than 142 can't install Tazamun. Firefox for Android updates through the Play Store, so this should affect few people.
 - The module interface gets a capability (write, read or none) that every module implements. On desktop, tabs, history and bookmarks are always *write*.
 - A phone can't add history or bookmarks. Users have to be told this plainly, in the options page and in the store listing.
 - No `tz` address-bar keyword on Android (no `omnibox`). History search is in the popup there.
 - If Firefox for Android adds `history` or `bookmarks` later, the module's capability check picks them up. Bookmarks on a phone would still need the full ADR-0006 safety work and testing on Android before being turned on there.
-- If AMO can't accept a package that declares `data_collection_permissions` and supports Android, the store submission has to be redesigned. That is the main open risk, and the spike checks it first.
 - Testing costs more: an Android emulator or a real phone through `web-ext run -t firefox-android` and adb. Unit tests cover capability detection and the tabs fallback with a fake browser without `windows`. An automated end-to-end run on Android is a Could; a manual release checklist is a Must (MOB-10).
 - Several places in the SRS, roadmap and pitfalls that said "desktop only" are updated in the same pull request.

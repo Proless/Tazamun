@@ -143,7 +143,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 
 ### P2: History and Firefox for Android (5–7 weeks)
 
-- [ ] **Android spike first** on a real phone: AMO and `data_collection_permissions`, minimum version, `tabs` events, alarms in the background, private tabs, `management`, Argon2id time. Update [ADR-0012](docs/adr/0012-firefox-for-android-in-1-0.md) and SRS 3.12 with the results (MOB-1, MOB-8, MOB-10).
+- [ ] **Android spike first** on a real phone: add `gecko_android.strict_min_version: 142.0`, check `web-ext lint` is clean and AMO accepts an unlisted test version; then `tabs` events, alarms in the background, private tabs, `management`, Argon2id time. Record the results in SRS 3.12 ([ADR-0012](docs/adr/0012-firefox-for-android-in-1-0.md); MOB-1, MOB-8, MOB-10).
 - [ ] Module capabilities (write, read, none), detected from the APIs present; generic handling in the engine and options page (MOB-2, MOB-6).
 - [ ] Tabs without `windows`: one window from `tabs.query`, `tabs` events only, open a window's tabs one by one (MOB-3, MOB-4).
 - [ ] Popup, options page and onboarding at 360 px and by touch (MOB-7). Kill and resume on Android loses nothing (MOB-9).
