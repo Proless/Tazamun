@@ -72,7 +72,18 @@ const steps = computed<Step[]>(() =>
 );
 const stepNumber = computed(() => steps.value.indexOf(step.value) + 1);
 
-onMounted(async () => {
+/**
+ * The defaults below fill fields the user can edit (device name, remember key, tabs). They load
+ * asynchronously, so the device step waits for them (`submitServer`); otherwise a slow load could
+ * overwrite a name the user already typed.
+ */
+let defaultsLoaded: Promise<void> = Promise.resolve();
+
+onMounted(() => {
+  defaultsLoaded = loadDefaults();
+});
+
+async function loadDefaults(): Promise<void> {
   const [device, settings, state] = await Promise.all([
     thisDevice(browser, navigator.userAgent),
     getSettings(browser),
@@ -86,7 +97,7 @@ onMounted(async () => {
     previous.value = { serverUrl: state.account.serverUrl, username: state.account.username };
   }
   existingServer.value = state.account?.serverUrl;
-});
+}
 
 function start(chosen: Mode): void {
   mode.value = chosen;
@@ -129,6 +140,7 @@ async function submitServer(): Promise<void> {
     }
     inviteNeeded.value = info.registration === 'invite';
     serverUrl.value = parsed.value;
+    await defaultsLoaded;
     step.value = 'device';
   } catch (err) {
     error.value = errorKey(err);
