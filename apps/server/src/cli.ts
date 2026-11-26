@@ -350,6 +350,7 @@ function accounts(args: readonly string[], io: CliIo): number {
       noArgs(rest);
       const rows = withDb(config, (db) => db.listAccounts()).map((a) => [
         a.id,
+        a.username ?? '-',
         date(a.createdAt),
         date(a.lastSeenAt),
         String(a.devices),
@@ -358,7 +359,7 @@ function accounts(args: readonly string[], io: CliIo): number {
       io.out(
         rows.length === 0
           ? 'No accounts.\n'
-          : table(['ID', 'CREATED', 'LAST SEEN', 'DEVICES', 'STORAGE'], rows),
+          : table(['ID', 'USERNAME', 'CREATED', 'LAST SEEN', 'DEVICES', 'STORAGE'], rows),
       );
       return 0;
     }

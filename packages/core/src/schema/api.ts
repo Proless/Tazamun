@@ -57,6 +57,14 @@ export const kdfParams = z.object({
 });
 export type KdfParamsBody = z.infer<typeof kdfParams>;
 
+/**
+ * A username (ACC-13): what people type to sign in. 3–32 characters, lowercase ASCII letters,
+ * digits, `.`, `_` and `-`, starting and ending with a letter or digit. ASCII only, so look-alike
+ * letters from other scripts can't imitate another user. Clients normalize first
+ * (`account.normalizeUsername`); the server accepts only the normalized form.
+ */
+export const username = z.string().regex(/^[a-z0-9][a-z0-9._-]{1,30}[a-z0-9]$/, 'Invalid username');
+
 /** Collection names: lowercase, so the server can stay ignorant of which collections exist. */
 export const collectionName = z.string().regex(/^[a-z][a-z0-9_-]{0,31}$/, 'Invalid collection');
 
@@ -77,6 +85,7 @@ export const ERROR_CODES = [
   'INVALID_CREDENTIALS',
   'NOT_FOUND',
   'ACCOUNT_EXISTS',
+  'USERNAME_TAKEN',
   'REGISTRATION_CLOSED',
   'INVITE_REQUIRED',
   'INVITE_INVALID',
@@ -90,13 +99,16 @@ export type ErrorCode = (typeof ERROR_CODES)[number];
 
 // ---- Accounts --------------------------------------------------------------------------------
 
-/** `POST /v1/accounts` (ACC-3). */
+/** `POST /v1/accounts` (ACC-3, ACC-5, ACC-13). */
 export const createAccountRequest = z.object({
   accountId,
+  username,
   salt: kdfSalt,
   kdfParams,
   authHash,
   wrappedAccountKey,
+  recoveryAuthHash: authHash,
+  recoveryWrappedAccountKey: wrappedAccountKey,
   invite: inviteToken.optional(),
 });
 export type CreateAccountRequest = z.infer<typeof createAccountRequest>;
@@ -104,9 +116,26 @@ export type CreateAccountRequest = z.infer<typeof createAccountRequest>;
 export const createAccountResponse = z.object({ accountId });
 export type CreateAccountResponse = z.infer<typeof createAccountResponse>;
 
-/** `GET /v1/accounts/{id}/prelogin`. Looks the same for unknown accounts (SEC-9). */
-export const preloginResponse = z.object({ salt: kdfSalt, kdfParams });
+/** `POST /v1/prelogin`: the username in the body, so it stays out of proxy access logs. */
+export const preloginRequest = z.object({ username });
+export type PreloginRequest = z.infer<typeof preloginRequest>;
+
+/** Looks the same for unknown usernames: a stable fake account ID and salt (SEC-9). */
+export const preloginResponse = z.object({ accountId, salt: kdfSalt, kdfParams });
 export type PreloginResponse = z.infer<typeof preloginResponse>;
+
+/** `GET /v1/accounts/me`. `username` is null for accounts created before usernames existed. */
+export const accountResponse = z.object({
+  accountId,
+  username: username.nullable(),
+  /** Whether a recovery key is set (ACC-5). */
+  recoveryKey: z.boolean(),
+});
+export type AccountResponse = z.infer<typeof accountResponse>;
+
+/** `PUT /v1/accounts/me/username` (ACC-13): set or change the username. */
+export const updateUsernameRequest = z.object({ username });
+export type UpdateUsernameRequest = z.infer<typeof updateUsernameRequest>;
 
 /** `DELETE /v1/accounts/me` (ACC-10): the passphrase is needed again. */
 export const deleteAccountRequest = z.object({ authKey });
@@ -183,6 +212,37 @@ export const updateKeysRequest = z.object({
   wrappedAccountKey,
 });
 export type UpdateKeysRequest = z.infer<typeof updateKeysRequest>;
+
+// ---- Recovery (ACC-5, ADR-0010) --------------------------------------------------------------
+
+/** `PUT /v1/recovery`: set or replace the recovery key. The passphrase is needed again. */
+export const setRecoveryRequest = z.object({
+  authKey,
+  recoveryAuthHash: authHash,
+  recoveryWrappedAccountKey: wrappedAccountKey,
+});
+export type SetRecoveryRequest = z.infer<typeof setRecoveryRequest>;
+
+/** `POST /v1/recovery/key`: prove the recovery key, get the account key wrapped under it. */
+export const recoveryKeyRequest = z.object({ username, recoveryAuthKey: authKey });
+export type RecoveryKeyRequest = z.infer<typeof recoveryKeyRequest>;
+
+export const recoveryKeyResponse = z.object({ accountId, wrappedAccountKey });
+export type RecoveryKeyResponse = z.infer<typeof recoveryKeyResponse>;
+
+/**
+ * `POST /v1/recovery/passphrase`: set a new passphrase with the recovery key. Every session ends,
+ * as with a passphrase change (ACC-9); the device then signs in with the new passphrase.
+ */
+export const recoverPassphraseRequest = z.object({
+  username,
+  recoveryAuthKey: authKey,
+  salt: kdfSalt,
+  kdfParams,
+  authHash,
+  wrappedAccountKey,
+});
+export type RecoverPassphraseRequest = z.infer<typeof recoverPassphraseRequest>;
 
 // ---- Info ------------------------------------------------------------------------------------
 

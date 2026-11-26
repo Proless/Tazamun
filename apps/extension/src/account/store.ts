@@ -1,8 +1,8 @@
 /**
  * Where this device keeps its account (SRS 3.1, SEC-5, ACC-11).
  *
- * - `storage.local` `account`: server URL, account ID, device ID and name, session token. Kept
- *   after sign-out (without the token), so reconnecting needs only the passphrase.
+ * - `storage.local` `account`: server URL, account ID, username, device ID and name, session
+ *   token. Kept after sign-out (without the token), so signing in again needs only the passphrase.
  * - The account key: `storage.local` when *remember on this device* is on (the default, Q3),
  *   otherwise `storage.session`, which the browser keeps in memory and clears when it closes.
  *   Exactly one of the two holds it at any time.
@@ -21,6 +21,8 @@ const SETTINGS_KEY = 'settings';
 const storedAccount = z.object({
   serverUrl: z.string().min(1),
   accountId: schema.accountId,
+  /** ACC-13. Absent for accounts from before usernames until one is set in the options page. */
+  username: schema.username.optional(),
   deviceId: schema.deviceId,
   deviceName: schema.deviceName,
   /** Absent after sign-out or revocation. */
@@ -84,6 +86,7 @@ export async function getAccountState(browser: WxtBrowser): Promise<AccountState
 export interface SignInResult {
   readonly serverUrl: string;
   readonly accountId: string;
+  readonly username: string;
   readonly deviceName: string;
   readonly deviceId: string;
   readonly token: string;
@@ -99,6 +102,7 @@ export async function saveSignedIn(
   const account: StoredAccount = {
     serverUrl: result.serverUrl,
     accountId: result.accountId,
+    username: result.username,
     deviceId: result.deviceId,
     deviceName: result.deviceName,
     token: result.token,
@@ -115,6 +119,14 @@ export async function setDeviceName(browser: WxtBrowser, deviceName: string): Pr
   const parsed = storedAccount.safeParse(raw);
   if (!parsed.success) return;
   await browser.storage.local.set({ [ACCOUNT_KEY]: { ...parsed.data, deviceName } });
+}
+
+/** ACC-13: the username after it was set or changed, or as the server reports it. */
+export async function setUsername(browser: WxtBrowser, username: string): Promise<void> {
+  const raw = (await browser.storage.local.get(ACCOUNT_KEY))[ACCOUNT_KEY];
+  const parsed = storedAccount.safeParse(raw);
+  if (!parsed.success || parsed.data.username === username) return;
+  await browser.storage.local.set({ [ACCOUNT_KEY]: { ...parsed.data, username } });
 }
 
 /** Unlock (SEC-5): the passphrase gave the account key back. */

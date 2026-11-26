@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  PairingCodeError,
   ServerUrlError,
+  UsernameError,
   estimateStrength,
-  formatPairingCode,
   hostPermissionPattern,
-  isPairingCode,
+  isValidUsername,
   normalizeServerUrl,
-  parsePairingCode,
+  parseUsername,
   passphraseLength,
 } from './index.ts';
 
@@ -52,33 +51,26 @@ describe('normalizeServerUrl', () => {
   });
 });
 
-describe('pairing codes (ACC-6)', () => {
-  const accountId = 'q4FIt0kT1zxqI0Z9Jq2cXw';
-
-  it('round-trips the server URL and account ID', () => {
-    const code = formatPairingCode({ serverUrl: 'sync.example.org/', accountId });
-    expect(code).toBe(`tazamun:${accountId}@https://sync.example.org`);
-    expect(isPairingCode(code)).toBe(true);
-    expect(parsePairingCode(`  ${code.slice(0, 20)}\n${code.slice(20)} `)).toEqual({
-      serverUrl: 'https://sync.example.org',
-      accountId,
-    });
-  });
-
-  it('holds nothing but the server URL and account ID', () => {
-    const code = formatPairingCode({ serverUrl: 'https://a.example', accountId });
-    expect(code.length).toBe('tazamun:'.length + accountId.length + 1 + 'https://a.example'.length);
-  });
-
+describe('usernames (ACC-13)', () => {
   it.each([
-    accountId,
-    `tazamun:${accountId}`,
-    `tazamun:short@https://a.example`,
-    `tazamun:${accountId}@http://insecure.example`,
-    `tazamun:${accountId}@`,
-  ])('rejects %j', (input) => {
-    expect(() => parsePairingCode(input)).toThrow(PairingCodeError);
+    ['hasan', 'hasan'],
+    ['  Hasan.D ', 'hasan.d'],
+    ['ｈａｓａｎ', 'hasan'],
+    ['a_b-c.9', 'a_b-c.9'],
+    ['abc', 'abc'],
+    ['a'.repeat(32), 'a'.repeat(32)],
+  ])('%j → %j', (input, expected) => {
+    expect(parseUsername(input)).toBe(expected);
+    expect(isValidUsername(input)).toBe(true);
   });
+
+  it.each(['', 'ab', 'a'.repeat(33), '.abc', 'abc-', 'ha san', 'hasän', 'hаsan', 'a@b', 'a/b'])(
+    'rejects %j',
+    (input) => {
+      expect(() => parseUsername(input)).toThrow(UsernameError);
+      expect(isValidUsername(input)).toBe(false);
+    },
+  );
 });
 
 describe('passphrase strength (ACC-4)', () => {

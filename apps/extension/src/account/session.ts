@@ -83,11 +83,12 @@ async function deviceIdFor(browser: WxtBrowser): Promise<string> {
   return state.account?.deviceId ?? account.newDeviceId();
 }
 
-/** SRS 3.1 step 1. Returns the account ID for the recovery kit. */
+/** SRS 3.1 step 1. Returns the recovery key to show once (ACC-5); it is never stored. */
 export async function createAndSignIn(
   browser: WxtBrowser,
   input: {
     serverUrl: string;
+    username: string;
     passphrase: string;
     invite?: string;
     device: DeviceChoice;
@@ -96,6 +97,7 @@ export async function createAndSignIn(
 ): Promise<string> {
   const deviceId = await deviceIdFor(browser);
   const signedIn = await account.createAccount(clientFor(input.serverUrl), {
+    username: input.username,
     passphrase: input.passphrase,
     device: { id: deviceId, name: input.device.name, browser: input.device.browser },
     ...(input.invite === undefined || input.invite === '' ? {} : { invite: input.invite }),
@@ -105,6 +107,7 @@ export async function createAndSignIn(
     {
       serverUrl: input.serverUrl,
       accountId: signedIn.accountId,
+      username: signedIn.username,
       deviceId,
       deviceName: signedIn.device.name,
       token: signedIn.token,
@@ -112,15 +115,37 @@ export async function createAndSignIn(
     },
     input.rememberKey,
   );
-  return signedIn.accountId;
+  return signedIn.recoveryKey;
 }
 
-/** SRS 3.1 step 2, and signing in again after a sign-out or revocation. */
+async function save(
+  browser: WxtBrowser,
+  serverUrl: string,
+  deviceId: string,
+  signedIn: account.SignedIn,
+  rememberKey: boolean,
+): Promise<void> {
+  await saveSignedIn(
+    browser,
+    {
+      serverUrl,
+      accountId: signedIn.accountId,
+      username: signedIn.username,
+      deviceId,
+      deviceName: signedIn.device.name,
+      token: signedIn.token,
+      accountKey: signedIn.accountKey,
+    },
+    rememberKey,
+  );
+}
+
+/** SRS 3.1 step 2 (username and passphrase), and signing in again after a sign-out. */
 export async function connectAndSignIn(
   browser: WxtBrowser,
   input: {
     serverUrl: string;
-    accountId: string;
+    username: string;
     passphrase: string;
     device: DeviceChoice;
     rememberKey: boolean;
@@ -128,22 +153,36 @@ export async function connectAndSignIn(
 ): Promise<void> {
   const deviceId = await deviceIdFor(browser);
   const signedIn = await account.connectAccount(clientFor(input.serverUrl), {
-    accountId: input.accountId,
+    username: input.username,
     passphrase: input.passphrase,
     device: { id: deviceId, name: input.device.name, browser: input.device.browser },
   });
-  await saveSignedIn(
-    browser,
-    {
-      serverUrl: input.serverUrl,
-      accountId: signedIn.accountId,
-      deviceId,
-      deviceName: signedIn.device.name,
-      token: signedIn.token,
-      accountKey: signedIn.accountKey,
-    },
-    input.rememberKey,
-  );
+  await save(browser, input.serverUrl, deviceId, signedIn, input.rememberKey);
+}
+
+/**
+ * ACC-5: the passphrase is lost. The recovery key sets a new one, every other browser is signed
+ * out (they sign in again with the new passphrase), and this one is signed in.
+ */
+export async function recoverAndSignIn(
+  browser: WxtBrowser,
+  input: {
+    serverUrl: string;
+    username: string;
+    recoveryKey: string;
+    newPassphrase: string;
+    device: DeviceChoice;
+    rememberKey: boolean;
+  },
+): Promise<void> {
+  const deviceId = await deviceIdFor(browser);
+  const signedIn = await account.recoverAccount(clientFor(input.serverUrl), {
+    username: input.username,
+    recoveryKey: input.recoveryKey,
+    newPassphrase: input.newPassphrase,
+    device: { id: deviceId, name: input.device.name, browser: input.device.browser },
+  });
+  await save(browser, input.serverUrl, deviceId, signedIn, input.rememberKey);
 }
 
 /** SEC-5: the key wasn't remembered; get it back with the passphrase. */

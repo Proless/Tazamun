@@ -5,7 +5,7 @@
  *   1. waits until the container's HEALTHCHECK reports healthy,
  *   2. creates an invite with the admin CLI inside the container,
  *   3. runs an API suite the way a client does (real Argon2id, a wrapped account key, encrypted
- *      records): create account, prelogin, sign in two devices, push, pull and decrypt, revoke,
+ *      records): create account, prelogin by username, sign in two devices, push, pull and decrypt, revoke,
  *   4. stops the container with SIGTERM and checks it shut down cleanly (exit 0, DEP-7),
  *   5. starts it again on the same /data and checks the data and sessions survived.
  *
@@ -136,27 +136,34 @@ async function run(): Promise<void> {
     tzCrypto.DEFAULT_KDF_PARAMS,
   );
   const accountKey = tzCrypto.generateAccountKey();
+  const random = (bytes: number) => tzCrypto.toBase64Url(tzCrypto.randomBytes(bytes));
   const created = await api('POST', '/v1/accounts', {
     body: {
       accountId,
+      username: 'smoke',
       salt: tzCrypto.toBase64Url(salt),
       kdfParams: tzCrypto.DEFAULT_KDF_PARAMS,
       authHash: tzCrypto.toBase64Url(await tzCrypto.hashAuthKey(authKey)),
       wrappedAccountKey: await tzCrypto.wrapAccountKey(kek, accountKey, accountId),
+      // The recovery key isn't exercised here (client.test.ts covers it); random bytes do.
+      recoveryAuthHash: random(32),
+      recoveryWrappedAccountKey: random(60),
       invite,
     } satisfies schema.CreateAccountRequest,
   });
   check(created.status === 201, `Create account: HTTP ${String(created.status)}`);
   // A second, otherwise valid account with the same invite. The server can't tell these random
   // bytes from real key material, so no second Argon2id run is needed.
-  const random = (bytes: number) => tzCrypto.toBase64Url(tzCrypto.randomBytes(bytes));
   const reused = await api('POST', '/v1/accounts', {
     body: {
       accountId: tzCrypto.randomId(),
+      username: 'smoke-2',
       salt: random(16),
       kdfParams: tzCrypto.DEFAULT_KDF_PARAMS,
       authHash: random(32),
       wrappedAccountKey: random(60),
+      recoveryAuthHash: random(32),
+      recoveryWrappedAccountKey: random(60),
       invite,
     } satisfies schema.CreateAccountRequest,
   });
@@ -167,10 +174,12 @@ async function run(): Promise<void> {
   );
   step('account created; the invite works only once');
 
-  // Sign in as a second browser would: prelogin, derive, unwrap (ACC-2, step 2 of SRS 3.1).
+  // Sign in as a second browser would: prelogin by username, derive, unwrap (ACC-2, ACC-13,
+  // step 2 of SRS 3.1).
   const prelogin = schema.preloginResponse.parse(
-    (await api('GET', `/v1/accounts/${accountId}/prelogin`)).json,
+    (await api('POST', '/v1/prelogin', { body: { username: 'smoke' } })).json,
   );
+  check(prelogin.accountId === accountId, 'Prelogin returned a different account ID');
   const derived = await tzCrypto.deriveMasterKeys(
     passphrase,
     tzCrypto.fromBase64Url(prelogin.salt),

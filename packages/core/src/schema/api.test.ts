@@ -30,10 +30,13 @@ async function registration() {
   const key = randomBytes(32);
   return {
     accountId: id,
+    username: 'hasan',
     salt: toBase64Url(randomBytes(16)),
     kdfParams: { ...DEFAULT_KDF_PARAMS },
     authHash: toBase64Url(await hashAuthKey(key)),
     wrappedAccountKey: await wrapAccountKey(kek, generateAccountKey(), id),
+    recoveryAuthHash: toBase64Url(await hashAuthKey(randomBytes(32))),
+    recoveryWrappedAccountKey: await wrapAccountKey(kek, generateAccountKey(), id),
   };
 }
 
@@ -52,6 +55,13 @@ describe('createAccountRequest', () => {
     const body = await registration();
     const weak = { ...body, kdfParams: { ...body.kdfParams, memoryKiB: 1024 } };
     expect(createAccountRequest.safeParse(weak).success).toBe(false);
+  });
+
+  it('accepts only normalized usernames (ACC-13)', async () => {
+    const body = await registration();
+    for (const name of ['Hasan', ' hasan', 'ab', 'hаsan']) {
+      expect(createAccountRequest.safeParse({ ...body, username: name }).success).toBe(false);
+    }
   });
 });
 

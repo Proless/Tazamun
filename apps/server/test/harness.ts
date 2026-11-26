@@ -34,23 +34,42 @@ export function payload(bytes = 64): string {
 
 export interface TestAccount {
   readonly accountId: string;
+  readonly username: string;
   readonly authKey: string;
+  /** ACC-5: proves the recovery key; the server stores its SHA-256. */
+  readonly recoveryAuthKey: string;
   readonly body: schema.CreateAccountRequest;
 }
 
-export function newAccount(invite?: string): TestAccount {
+let accounts = 0;
+
+export function sha256b64(bytes: Uint8Array): string {
+  return b64(createHash('sha256').update(bytes).digest());
+}
+
+export function newAccount(invite?: string, username = `user-${String(++accounts)}`): TestAccount {
   const accountId = tzCrypto.randomId();
   const authKey = randomBytes(32);
+  const recoveryAuthKey = randomBytes(32);
   const body: schema.CreateAccountRequest = {
     accountId,
+    username,
     salt: rand(16),
     kdfParams: { ...tzCrypto.DEFAULT_KDF_PARAMS },
-    authHash: b64(createHash('sha256').update(authKey).digest()),
+    authHash: sha256b64(authKey),
     // The server can't tell a real wrapped key from random bytes of the right length.
     wrappedAccountKey: rand(60),
+    recoveryAuthHash: sha256b64(recoveryAuthKey),
+    recoveryWrappedAccountKey: rand(60),
     ...(invite === undefined ? {} : { invite }),
   };
-  return { accountId, authKey: b64(authKey), body };
+  return {
+    accountId,
+    username,
+    authKey: b64(authKey),
+    recoveryAuthKey: b64(recoveryAuthKey),
+    body,
+  };
 }
 
 export function makeHarness(options: HarnessOptions = {}) {
