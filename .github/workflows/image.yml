@@ -86,7 +86,7 @@ jobs:
           REPORT: ${{ steps.scan.outputs.json }}
         run: node scripts/scan-summary.ts "$REPORT"
       # Code scanning needs GitHub Advanced Security on private repositories, so results go there
-      # once the repository is public. Pull requests from forks can't upload either.
+      # only while the repository is public. Pull requests from forks can't upload either.
       - name: Scan (SARIF)
         if: matrix.arch == 'amd64' && !github.event.repository.private && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
         id: sarif

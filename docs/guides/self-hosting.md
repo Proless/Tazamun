@@ -2,7 +2,7 @@
 
 Tazamun has no official hosted service: every account lives on a server someone runs. This guide gets one running with Docker. The server stores only encrypted data. Whoever runs it can see metadata (how many records, when, and from which IP addresses) but never your tabs, history or bookmarks ([SRS 5.2](<../srs/5. Other Nonfunctional Requirements.md#52-security-requirements>)).
 
-> **Status:** only the `edge` image exists so far, built from the latest `main`. Expect changes until 1.0. While the repository is private, so is the image; it becomes pullable without signing in when the project is published.
+> **Status:** only the `edge` image exists so far, built from the latest `main`. Expect changes until 1.0. The image is public: pull it without signing in. If a pull fails with `unauthorized`, an old GHCR login is probably saved on the machine; run `docker logout ghcr.io` and pull again.
 
 ## What you need
 
