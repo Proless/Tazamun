@@ -45,6 +45,7 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 - `alarms.create` with an existing name resets that alarm's schedule. Create the poll only if `alarms.get` finds none, or every worker wake-up postpones it.
 - `runtime.onMessage` in Chrome needs `sendResponse` plus `return true`. WXT uses the plain `chrome` API there, without a promise polyfill, so a returned promise doesn't reach the page.
 - The background listens to `storage.onChanged` for `account`, `accountKey` and `settings`. The engine writes only `engineStatus`, so it never triggers itself; keep it that way.
+- **Clock warnings (ENG-15):** `#pullAll` compares the `time` from `/v1/info` with the middle of the request, so latency doesn't count, and sets `clockSkewMinutes` in the status (positive: this clock is ahead). `clockWarning` is the other case: a record stamped more than 24 h ahead. Popup and options show both through `clockNotice`; the badge doesn't. Set `FakeServer.time` to test it.
 - Engine tests use `FakeServer` and `FakeTabsModule` from `src/engine/testing.ts`. Module tests should use them too: they speak the real wire format through `@tazamun/core`'s schemas.
 
 ### Tabs module

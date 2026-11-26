@@ -9,7 +9,7 @@ import RecoveryKey from './RecoveryKey.vue';
 import { loadDevices } from '../account/devices.ts';
 import { getSettings, setRememberKey, type StoredAccount } from '../account/store.ts';
 import type { EngineStatus } from '../engine/engine.ts';
-import { statusMessageKey } from '../engine/status.ts';
+import { clockNotice, statusMessageKey } from '../engine/status.ts';
 import { EXCLUSION_EXAMPLES } from '../lib/exclusions.ts';
 import { t, uiLocale } from '../lib/i18n.ts';
 import { readStatus, requestSync, togglePaused, watchStatus } from '../lib/sync-client.ts';
@@ -56,6 +56,8 @@ const recoveryBusy = ref(false);
 const recoveryResult = ref<RecoveryKeyResult | undefined>();
 const deviceError = ref(false);
 let stopWatching: (() => void) | undefined;
+
+const clock = computed(() => (status.value === undefined ? undefined : clockNotice(status.value)));
 
 const statusLine = computed(() => {
   const s = status.value;
@@ -322,6 +324,7 @@ async function revoke(device: schema.Device): Promise<void> {
   <section class="no-print">
     <h2>{{ t('optionsSync') }}</h2>
     <p v-if="statusLine" role="status">{{ statusLine }}</p>
+    <p v-if="clock" role="alert" class="warning-box">{{ t(clock.key, clock.substitutions) }}</p>
     <div class="actions">
       <button type="button" :disabled="paused" @click="syncNow">{{ t('syncNow') }}</button>
       <button type="button" class="secondary" @click="changePaused">

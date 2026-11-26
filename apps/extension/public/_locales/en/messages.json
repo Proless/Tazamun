@@ -796,5 +796,29 @@
         "example": "1 hour ago"
       }
     }
+  },
+  "statusClockAhead": {
+    "message": "This computer’s clock is about $MINUTES$ minutes ahead of the server’s. Set it right (or turn on automatic time), or changes may be put in the wrong order.",
+    "description": "Popup and options: the local clock is more than 5 minutes ahead of the server (ENG-15).",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "statusClockBehind": {
+    "message": "This computer’s clock is about $MINUTES$ minutes behind the server’s. Set it right (or turn on automatic time), or changes may be put in the wrong order.",
+    "description": "Popup and options: the local clock is more than 5 minutes behind the server (ENG-15).",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "statusClockRemote": {
+    "message": "Another browser’s clock is far in the future. Its changes were applied, but check the date and time on your other computers.",
+    "description": "Popup and options: a record carried a time more than 24 hours ahead (ENG-15)."
   }
 }

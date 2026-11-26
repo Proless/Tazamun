@@ -4,7 +4,13 @@ import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { crypto as tzCrypto } from '@tazamun/core';
 import { saveSignedIn } from '../account/store.ts';
 import { MemoryStore } from '../engine/store.ts';
-import { STATUS_KEY, badgeFor, parseStatus, statusMessageKey } from '../engine/status.ts';
+import {
+  STATUS_KEY,
+  badgeFor,
+  clockNotice,
+  parseStatus,
+  statusMessageKey,
+} from '../engine/status.ts';
 import { FakeServer, FakeTabsModule, tabsWith } from '../engine/testing.ts';
 import { BackgroundSync, POLL_ALARM, RETRY_ALARM, isSyncMessage } from './sync.ts';
 
@@ -114,6 +120,7 @@ describe('BackgroundSync', () => {
   it('accepts only its own message shapes', () => {
     expect(isSyncMessage({ type: 'sync-now' })).toBe(true);
     expect(isSyncMessage({ type: 'local-change' })).toBe(true);
+    expect(isSyncMessage({ type: 'poll' })).toBe(true);
     expect(isSyncMessage({ type: 'delete-everything' })).toBe(false);
     expect(isSyncMessage('sync-now')).toBe(false);
   });
@@ -138,6 +145,24 @@ describe('status display (ENG-13, UI-6)', () => {
     );
     expect(statusMessageKey({ ...base, state: 'idle', updateRequired: true })).toBe(
       'statusUpdateRequired',
+    );
+  });
+
+  it('warns about clocks, a skewed local one first (ENG-15)', () => {
+    expect(clockNotice({ ...base, state: 'idle' })).toBeUndefined();
+    expect(clockNotice({ ...base, state: 'idle', clockSkewMinutes: 12 })).toEqual({
+      key: 'statusClockAhead',
+      substitutions: ['12'],
+    });
+    expect(
+      clockNotice({ ...base, state: 'idle', clockSkewMinutes: -7, clockWarning: true }),
+    ).toEqual({ key: 'statusClockBehind', substitutions: ['7'] });
+    expect(clockNotice({ ...base, state: 'idle', clockWarning: true })?.key).toBe(
+      'statusClockRemote',
+    );
+    // Survives the round trip through storage.
+    expect(parseStatus({ ...base, state: 'idle', clockSkewMinutes: 12 })?.clockSkewMinutes).toBe(
+      12,
     );
   });
 
