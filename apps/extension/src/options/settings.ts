@@ -1,9 +1,10 @@
 /**
- * Options page logic (UI-3), outside the `.vue` file so it is tested: device name (ACC-7),
- * revoking devices (ACC-8), modules on or off with PRIV-2, and the exclusion list (PRIV-3).
+ * Options page logic (UI-3), outside the `.vue` file so it is tested: username (ACC-13), recovery
+ * key (ACC-5), device name (ACC-7), revoking devices (ACC-8), modules on or off with PRIV-2, and
+ * the exclusion list (PRIV-3).
  */
 import type { WxtBrowser } from 'wxt/browser';
-import type { schema } from '@tazamun/core';
+import { account as coreAccount, api, type schema } from '@tazamun/core';
 import { loadDevices } from '../account/devices.ts';
 import { clientFor, handleUnauthorized } from '../account/session.ts';
 import {
@@ -11,11 +12,12 @@ import {
   getSettings,
   saveSettings,
   setDeviceName,
+  setUsername,
   type ModuleId,
 } from '../account/store.ts';
 import type { SyncMessage } from '../background/sync.ts';
 import { parseExclusion } from '../lib/exclusions.ts';
-import { validateDeviceName } from '../onboarding/form.ts';
+import { validateDeviceName, validateUsername } from '../onboarding/form.ts';
 
 export type ActionResult = { ok: true } | { ok: false; error: 'invalid' | 'signed-out' | 'failed' };
 
@@ -30,6 +32,81 @@ async function call(browser: WxtBrowser, action: () => Promise<void>): Promise<A
     return { ok: true };
   } catch (err) {
     if (await handleUnauthorized(browser, err)) return { ok: false, error: 'signed-out' };
+    return { ok: false, error: 'failed' };
+  }
+}
+
+/**
+ * The account as the server sees it: username (null for accounts from before usernames) and
+ * whether a recovery key is set. Undefined when offline or signed out.
+ */
+export async function loadAccountInfo(
+  browser: WxtBrowser,
+): Promise<schema.AccountResponse | undefined> {
+  const account = await signedIn(browser);
+  if (account === undefined) return undefined;
+  try {
+    const info = await clientFor(account.serverUrl, account.token).account();
+    if (info.username !== null) await setUsername(browser, info.username);
+    return info;
+  } catch (err) {
+    await handleUnauthorized(browser, err);
+    return undefined;
+  }
+}
+
+export type UsernameResult =
+  | { ok: true; username: string }
+  | { ok: false; error: 'invalid' | 'taken' | 'signed-out' | 'failed' };
+
+/** ACC-13: set or change the username. Other browsers keep working; they sign in with it next time. */
+export async function changeUsername(browser: WxtBrowser, input: string): Promise<UsernameResult> {
+  const username = validateUsername(input);
+  if (!username.ok) return { ok: false, error: 'invalid' };
+  const account = await signedIn(browser);
+  if (account === undefined) return { ok: false, error: 'signed-out' };
+  try {
+    await clientFor(account.serverUrl, account.token).updateUsername(username.value);
+    await setUsername(browser, username.value);
+    return { ok: true, username: username.value };
+  } catch (err) {
+    if (await handleUnauthorized(browser, err)) return { ok: false, error: 'signed-out' };
+    if (err instanceof api.ApiError && err.code === 'USERNAME_TAKEN') {
+      return { ok: false, error: 'taken' };
+    }
+    return { ok: false, error: 'failed' };
+  }
+}
+
+export type RecoveryKeyResult =
+  | { ok: true; recoveryKey: string }
+  | { ok: false; error: 'wrong-passphrase' | 'locked' | 'signed-out' | 'failed' };
+
+/**
+ * ACC-5: a new recovery key, replacing the old one (which stops working). Needs the passphrase,
+ * and this browser must be unlocked, since the key wraps the account key.
+ */
+export async function newRecoveryKey(
+  browser: WxtBrowser,
+  passphrase: string,
+): Promise<RecoveryKeyResult> {
+  const state = await getAccountState(browser);
+  if (state.status === 'locked') return { ok: false, error: 'locked' };
+  if (state.status !== 'signed-in') return { ok: false, error: 'signed-out' };
+  const { serverUrl, token, accountId } = state.account;
+  try {
+    const recoveryKey = await coreAccount.createRecoveryKey(
+      clientFor(serverUrl, token),
+      accountId,
+      state.accountKey,
+      passphrase,
+    );
+    return { ok: true, recoveryKey };
+  } catch (err) {
+    if (await handleUnauthorized(browser, err)) return { ok: false, error: 'signed-out' };
+    if (err instanceof api.ApiError && err.code === 'INVALID_CREDENTIALS') {
+      return { ok: false, error: 'wrong-passphrase' };
+    }
     return { ok: false, error: 'failed' };
   }
 }

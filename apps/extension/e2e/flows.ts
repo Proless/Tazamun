@@ -21,8 +21,13 @@ async function waitFor<T>(
 
 export { waitFor };
 
-/** SRS 3.1 step 1. Returns the pairing code from the recovery kit. */
-export async function createAccount(device: Device, server: string, name: string): Promise<string> {
+/** SRS 3.1 step 1. Returns the recovery key, shown once (ACC-5). */
+export async function createAccount(
+  device: Device,
+  server: string,
+  username: string,
+  name: string,
+): Promise<string> {
   const page = await device.open('onboarding.html');
   await page.click('Create an account');
   await page.fill('#server', server);
@@ -31,36 +36,70 @@ export async function createAccount(device: Device, server: string, name: string
   await page.fill('#device-name', name);
   await page.click('Continue');
   await page.waitForText('Your passphrase');
+  await page.fill('#username', username);
   await page.fill('#passphrase', PASSPHRASE);
   await page.fill('#confirmation', PASSPHRASE);
   await page.eval(
     `(() => { const c = document.querySelector('.warning input'); c.click(); return true; })()`,
   );
   await page.click('Create account');
-  await page.waitForText('Pairing code', 60_000);
-  const code = await page.eval<string>(
-    `document.querySelector('.kit code.wrap').textContent.trim()`,
+  await page.waitForText('Your recovery key', 60_000);
+  const key = await page.eval<string>(
+    `document.querySelector('.recovery .key code').textContent.trim()`,
   );
+  await page.eval(
+    `(() => { const c = document.querySelector('.check input'); c.click(); return true; })()`,
+  );
+  await page.click('Continue');
+  await page.waitForText('This browser is connected');
   await page.close();
-  return code;
+  return key;
 }
 
-/** SRS 3.1 step 2, with the pairing code. */
+/** SRS 3.1 step 2: server, username and passphrase. */
 export async function connectAccount(
   device: Device,
-  pairingCode: string,
+  server: string,
+  username: string,
   name: string,
 ): Promise<void> {
   const page = await device.open('onboarding.html');
-  await page.click('Connect to an existing account');
-  await page.fill('#server', pairingCode);
+  await page.click('Sign in to an existing account');
+  await page.fill('#server', server);
   await page.click('Continue');
   await page.waitForText('Device name');
   await page.fill('#device-name', name);
   await page.click('Continue');
   await page.waitForText('Sign in');
+  await page.fill('#username', username);
   await page.fill('#passphrase', PASSPHRASE);
   await page.click('Connect');
+  await page.waitForText('This browser is connected', 60_000);
+  await page.close();
+}
+
+/** ACC-5: the passphrase is forgotten; set a new one with the recovery key. */
+export async function recoverAccount(
+  device: Device,
+  server: string,
+  username: string,
+  recoveryKey: string,
+  newPassphrase: string,
+): Promise<void> {
+  const page = await device.open('onboarding.html');
+  await page.click('Sign in to an existing account');
+  await page.fill('#server', server);
+  await page.click('Continue');
+  await page.waitForText('Device name');
+  await page.click('Continue');
+  await page.waitForText('Sign in');
+  await page.click('Forgot your passphrase?');
+  await page.waitForText('Set a new passphrase');
+  await page.fill('#username', username);
+  await page.fill('#recovery-key', recoveryKey);
+  await page.fill('#passphrase', newPassphrase);
+  await page.fill('#confirmation', newPassphrase);
+  await page.click('Set new passphrase');
   await page.waitForText('This browser is connected', 60_000);
   await page.close();
 }

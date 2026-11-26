@@ -85,29 +85,44 @@ export interface OpenOptions {
 
 export interface AccountRow {
   readonly id: string;
+  readonly username: string | undefined;
   readonly salt: string;
   readonly kdfParams: schema.KdfParamsBody;
   readonly authHash: Uint8Array;
   readonly wrappedAccountKey: string;
+  readonly recovery: RecoverySecrets | undefined;
   readonly createdAt: number;
   readonly lastSeenAt: number;
   readonly storageBytes: number;
 }
 
+/** ACC-5: what the server keeps for the recovery key. */
+export interface RecoverySecrets {
+  readonly authHash: Uint8Array;
+  readonly wrappedAccountKey: string;
+}
+
 export interface AccountSummary {
   readonly id: string;
+  readonly username: string | undefined;
   readonly createdAt: number;
   readonly lastSeenAt: number;
   readonly storageBytes: number;
   readonly devices: number;
 }
 
-export interface NewAccount {
-  readonly id: string;
+/** The passphrase-derived part of an account (ACC-3); replaced on a passphrase change. */
+export interface PassphraseSecrets {
   readonly salt: string;
   readonly kdfParams: schema.KdfParamsBody;
   readonly authHash: Uint8Array;
   readonly wrappedAccountKey: string;
+}
+
+export interface NewAccount extends PassphraseSecrets {
+  readonly id: string;
+  readonly username: string;
+  readonly recovery: RecoverySecrets;
 }
 
 export interface DeviceRow {
@@ -153,7 +168,7 @@ export interface IncomingRecord {
   readonly expiresAt: number | undefined;
 }
 
-export type CreateAccountResult = 'created' | 'exists' | 'invite-invalid';
+export type CreateAccountResult = 'created' | 'exists' | 'username-taken' | 'invite-invalid';
 export type PushResult =
   | { readonly ok: true; readonly seqs: readonly { id: string; seq: number }[] }
   | { readonly ok: false; readonly reason: 'quota'; readonly usedBytes: number };
@@ -171,6 +186,16 @@ function num(row: Row, key: string): number {
 function optNum(row: Row, key: string): number | undefined {
   const v = row[key];
   return v === null ? undefined : num(row, key);
+}
+
+function optStr(row: Row, key: string): string | undefined {
+  const v = row[key];
+  return v === null ? undefined : str(row, key);
+}
+
+function optBytes(row: Row, key: string): Uint8Array | undefined {
+  const v = row[key];
+  return v === null ? undefined : bytes(row, key);
 }
 
 function str(row: Row, key: string): string {
@@ -403,6 +428,9 @@ export class Database {
     try {
       return this.transaction(() => {
         if (this.#get('SELECT 1 AS x FROM accounts WHERE id = ?', account.id)) return 'exists';
+        if (this.#get('SELECT 1 AS x FROM accounts WHERE username = ?', account.username)) {
+          return 'username-taken';
+        }
         if (inviteHash !== undefined) {
           const used = this.#run(
             `UPDATE invites SET used_at = ?
@@ -414,13 +442,17 @@ export class Database {
           if (used === 0) throw new Rollback();
         }
         this.#run(
-          `INSERT INTO accounts (id, salt, kdf_params, auth_hash, wrapped_account_key, created_at, last_seen_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO accounts (id, username, salt, kdf_params, auth_hash, wrapped_account_key,
+                                 recovery_auth_hash, recovery_wrapped_account_key, created_at, last_seen_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           account.id,
+          account.username,
           account.salt,
           JSON.stringify(account.kdfParams),
           account.authHash,
           account.wrappedAccountKey,
+          account.recovery.authHash,
+          account.recovery.wrappedAccountKey,
           now,
           now,
         );
@@ -434,17 +466,33 @@ export class Database {
 
   getAccount(id: string): AccountRow | undefined {
     const row = this.#get('SELECT * FROM accounts WHERE id = ?', id);
-    if (row === undefined) return undefined;
-    return {
-      id: str(row, 'id'),
-      salt: str(row, 'salt'),
-      kdfParams: JSON.parse(str(row, 'kdf_params')) as schema.KdfParamsBody,
-      authHash: bytes(row, 'auth_hash'),
-      wrappedAccountKey: str(row, 'wrapped_account_key'),
-      createdAt: num(row, 'created_at'),
-      lastSeenAt: num(row, 'last_seen_at'),
-      storageBytes: num(row, 'storage_bytes'),
-    };
+    return row === undefined ? undefined : accountRow(row);
+  }
+
+  /** ACC-13: look an account up by its (normalized) username. */
+  getAccountByUsername(username: string): AccountRow | undefined {
+    const row = this.#get('SELECT * FROM accounts WHERE username = ?', username);
+    return row === undefined ? undefined : accountRow(row);
+  }
+
+  /** ACC-13: set or change the username. `false` if another account has it. */
+  setUsername(accountId: string, username: string): boolean {
+    return this.transaction(() => {
+      const owner = this.#get('SELECT id FROM accounts WHERE username = ?', username);
+      if (owner !== undefined) return str(owner, 'id') === accountId;
+      this.#run('UPDATE accounts SET username = ? WHERE id = ?', username, accountId);
+      return true;
+    });
+  }
+
+  /** ACC-5: set or replace the recovery key. */
+  setRecovery(accountId: string, recovery: RecoverySecrets): void {
+    this.#run(
+      'UPDATE accounts SET recovery_auth_hash = ?, recovery_wrapped_account_key = ? WHERE id = ?',
+      recovery.authHash,
+      recovery.wrappedAccountKey,
+      accountId,
+    );
   }
 
   /** ACC-10: deletes the account with every record, device and session (cascade). */
@@ -459,7 +507,11 @@ export class Database {
    * ACC-9: replace the key bundle after a passphrase change, and end every session except
    * `keepSessionHash` (the device that changed it).
    */
-  updateKeys(accountId: string, keys: Omit<NewAccount, 'id'>, keepSessionHash: Uint8Array): void {
+  updateKeys(
+    accountId: string,
+    keys: PassphraseSecrets,
+    keepSessionHash: Uint8Array | undefined,
+  ): void {
     this.transaction(() => {
       this.#run(
         `UPDATE accounts SET salt = ?, kdf_params = ?, auth_hash = ?, wrapped_account_key = ?
@@ -470,10 +522,11 @@ export class Database {
         keys.wrappedAccountKey,
         accountId,
       );
+      // Without a session to keep (recovery, ACC-5), every session ends.
       this.#run(
-        'DELETE FROM sessions WHERE account_id = ? AND token_hash <> ?',
+        'DELETE FROM sessions WHERE account_id = ? AND token_hash IS NOT ?',
         accountId,
-        keepSessionHash,
+        keepSessionHash ?? null,
       );
     });
   }
@@ -481,11 +534,12 @@ export class Database {
   /** Metadata of every account, for `tazamun accounts list` (DEP-16). Never content. */
   listAccounts(): AccountSummary[] {
     return this.#all(
-      `SELECT a.id, a.created_at, a.last_seen_at, a.storage_bytes,
+      `SELECT a.id, a.username, a.created_at, a.last_seen_at, a.storage_bytes,
               (SELECT COUNT(*) FROM devices d WHERE d.account_id = a.id) AS devices
        FROM accounts a ORDER BY a.created_at, a.id`,
     ).map((row) => ({
       id: str(row, 'id'),
+      username: optStr(row, 'username'),
       createdAt: num(row, 'created_at'),
       lastSeenAt: num(row, 'last_seen_at'),
       storageBytes: num(row, 'storage_bytes'),
@@ -776,6 +830,26 @@ export class Database {
       return this.#run('DELETE FROM records WHERE expires_at IS NOT NULL AND expires_at <= ?', now);
     });
   }
+}
+
+function accountRow(row: Row): AccountRow {
+  const recoveryHash = optBytes(row, 'recovery_auth_hash');
+  const recoveryWrapped = optStr(row, 'recovery_wrapped_account_key');
+  return {
+    id: str(row, 'id'),
+    username: optStr(row, 'username'),
+    salt: str(row, 'salt'),
+    kdfParams: JSON.parse(str(row, 'kdf_params')) as schema.KdfParamsBody,
+    authHash: bytes(row, 'auth_hash'),
+    wrappedAccountKey: str(row, 'wrapped_account_key'),
+    recovery:
+      recoveryHash === undefined || recoveryWrapped === undefined
+        ? undefined
+        : { authHash: recoveryHash, wrappedAccountKey: recoveryWrapped },
+    createdAt: num(row, 'created_at'),
+    lastSeenAt: num(row, 'last_seen_at'),
+    storageBytes: num(row, 'storage_bytes'),
+  };
 }
 
 function deviceRow(row: Row): DeviceRow {

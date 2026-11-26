@@ -65,4 +65,12 @@ export const MIGRATIONS: readonly string[] = [
   CREATE UNIQUE INDEX records_seq ON records (account_id, collection, seq);
   CREATE INDEX records_expiry ON records (expires_at) WHERE expires_at IS NOT NULL;
   `,
+  // 2: usernames and the recovery key (ACC-5, ACC-13, ADR-0010). All three are NULL for accounts
+  // created before; such an account sets them from a signed-in device.
+  `
+  ALTER TABLE accounts ADD COLUMN username TEXT;
+  CREATE UNIQUE INDEX accounts_username ON accounts (username);
+  ALTER TABLE accounts ADD COLUMN recovery_auth_hash BLOB;           -- SHA-256(recovery auth key)
+  ALTER TABLE accounts ADD COLUMN recovery_wrapped_account_key TEXT;
+  `,
 ];

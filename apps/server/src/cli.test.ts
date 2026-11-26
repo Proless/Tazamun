@@ -59,10 +59,12 @@ function setup(options: { serverRunning?: boolean; createDb?: boolean } = {}) {
       db.createAccount(
         {
           id,
+          username: `u-${id.toLowerCase().replace(/[^a-z0-9]/g, '0')}`,
           salt: 'salt',
           kdfParams: { ...tzCrypto.DEFAULT_KDF_PARAMS },
           authHash: new Uint8Array(32),
           wrappedAccountKey: 'wrapped',
+          recovery: { authHash: new Uint8Array(32), wrappedAccountKey: 'r' },
         },
         NOW,
       );
@@ -151,15 +153,19 @@ describe('invite (ADM-2)', () => {
     expect(t.out()).toContain('expires: 2026-12-01T10:00:00Z');
     const account = {
       id: tzCrypto.randomId(),
+      username: 'first',
       salt: 's',
       kdfParams: { ...tzCrypto.DEFAULT_KDF_PARAMS },
       authHash: new Uint8Array(32),
       wrappedAccountKey: 'w',
+      recovery: { authHash: new Uint8Array(32), wrappedAccountKey: 'r' },
     };
     const hash = tokenHash(token ?? '');
     expect(t.withDb((db) => db.createAccount(account, NOW, hash))).toBe('created');
     expect(
-      t.withDb((db) => db.createAccount({ ...account, id: tzCrypto.randomId() }, NOW, hash)),
+      t.withDb((db) =>
+        db.createAccount({ ...account, id: tzCrypto.randomId(), username: 'second' }, NOW, hash),
+      ),
     ).toBe('invite-invalid');
   });
 
@@ -297,7 +303,7 @@ describe('accounts', () => {
     const id = t.addAccount();
     expect(await t.run('accounts', 'list')).toBe(0);
     expect(t.out()).toMatch(
-      new RegExp(`${id}\\s+2026-11-24T10:00:00Z\\s+2026-11-24T10:00:00Z\\s+0\\s+101 B`),
+      new RegExp(`${id}\\s+u-\\S+\\s+2026-11-24T10:00:00Z\\s+2026-11-24T10:00:00Z\\s+0\\s+101 B`),
     );
     expect(t.out()).not.toContain('x'.repeat(100));
   });

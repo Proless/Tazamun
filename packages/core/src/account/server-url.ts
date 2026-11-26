@@ -17,8 +17,8 @@ const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 /**
  * Normalize user input to `scheme://host[:port][/path]` without a trailing slash, so the same
- * server always gives the same string (it's stored, shown in the recovery kit and put into pairing
- * codes). `sync.example.org` becomes `https://sync.example.org`, `localhost:8080`
+ * server always gives the same string (it's stored with the account and shown in the recovery key
+ * document). `sync.example.org` becomes `https://sync.example.org`, `localhost:8080`
  * becomes `http://localhost:8080`.
  *
  * Throws ServerUrlError for anything that isn't HTTPS (or HTTP on a loopback host), and for URLs

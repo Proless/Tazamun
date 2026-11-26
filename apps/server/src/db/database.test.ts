@@ -1,5 +1,6 @@
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { crypto as tzCrypto } from '@tazamun/core';
@@ -20,10 +21,15 @@ function withAccount(db: Database, id = 'acct'): string {
   db.createAccount(
     {
       id,
+      username: id
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '0')
+        .padEnd(3, '0'),
       salt: 'salt',
       kdfParams: { ...tzCrypto.DEFAULT_KDF_PARAMS },
       authHash: new Uint8Array(32),
       wrappedAccountKey: 'wrapped',
+      recovery: { authHash: new Uint8Array(32), wrappedAccountKey: 'r' },
     },
     0,
   );
@@ -86,6 +92,29 @@ describe('migrations (ADM-4)', () => {
     ).toThrow();
     const db = Database.open(path, { migrations: ['CREATE TABLE a (x)'] });
     expect(db.schemaVersion).toBe(1);
+    db.close();
+  });
+
+  it('keeps accounts from before usernames, which then set one (migration 2, ACC-13)', () => {
+    const path = join(tempDir(), 'db.sqlite');
+    Database.open(path, { migrations: MIGRATIONS.slice(0, 1) }).close();
+    const raw = new DatabaseSync(path);
+    raw
+      .prepare(
+        `INSERT INTO accounts (id, salt, kdf_params, auth_hash, wrapped_account_key, created_at, last_seen_at)
+         VALUES ('old', 's', ?, ?, 'w', 0, 0)`,
+      )
+      .run(JSON.stringify(tzCrypto.DEFAULT_KDF_PARAMS), new Uint8Array(32));
+    raw.close();
+
+    const db = Database.open(path);
+    expect(db.schemaVersion).toBe(MIGRATIONS.length);
+    const old = db.getAccount('old');
+    expect(old).toMatchObject({ id: 'old', username: undefined, recovery: undefined });
+    expect(db.setUsername('old', 'hasan')).toBe(true);
+    withAccount(db, 'new');
+    expect(db.setUsername('new', 'hasan')).toBe(false);
+    expect(db.getAccountByUsername('hasan')?.id).toBe('old');
     db.close();
   });
 });

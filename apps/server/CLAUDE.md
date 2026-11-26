@@ -39,7 +39,11 @@ Read this before changing anything in `apps/server`. The repository-wide rules i
 ### Security
 - Compare hashes with `hashesEqual` (constant time). For an unknown account, `verifyAuthKey` still hashes and compares against a dummy, so timing doesn't reveal whether the account exists.
 - Rate-limit sign-in per IP **and** per account, so spreading guesses over many IPs doesn't help. Rate limits are in memory and reset on restart; that's acceptable.
-- `prelogin` for unknown IDs must look exactly like a real response: the same shape, default parameters, and a salt derived from the instance secret so repeated queries agree (SEC-9).
+- `prelogin` for unknown usernames must look exactly like a real response: the same shape, default parameters, and an account ID and salt derived from the instance secret so repeated queries agree (SEC-9).
+- The recovery endpoints (`/v1/recovery/key`, `/v1/recovery/passphrase`) sign nobody in but hand out key material, so treat them like sign-in: rate-limit per IP and per account, always run the hash comparison (also for unknown usernames and accounts without a recovery key), and answer `INVALID_CREDENTIALS` for every failure.
+- Usernames are plaintext metadata the operator sees (ADR-0010). Never log them: they identify people. The log test checks it.
+- `createAccount` checks the username before the invite, so a taken username doesn't use the invite up. Keep that order.
+- Accounts from before migration 2 have `username`, `recovery_auth_hash` and `recovery_wrapped_account_key` NULL. Every read must handle that (`AccountRow.username` and `recovery` are optional).
 - With `TAZAMUN_TRUST_PROXY`, the client IP is the **last** `X-Forwarded-For` entry, the one our own proxy added. Earlier entries come from the client and can be forged.
 - Never log request bodies. History record IDs in logs reveal browsing patterns over time.
 

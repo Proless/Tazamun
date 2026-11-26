@@ -11,7 +11,7 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 ## Current status
 
 - **Phase:** P1 (engine, server, accounts, tabs). P0's exit criteria are met: workspace, tooling and CI are set up, and `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Q1 is decided: Hono and `node:sqlite`.
-- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `deploy/` (Dockerfile, Compose files, proxy examples; see [deploy/README.md](deploy/README.md)), `scripts/`, `docs/`, `.github/`. The image pipeline builds, smoke-tests and scans every PR and publishes `edge` from `main`. `apps/extension` has the WXT scaffold for three targets and onboarding: create or connect an account, recovery kit, lock, sign-out and revoked states (see [apps/extension/README.md](apps/extension/README.md)); `packages/core` has the API client and account flows they use. The sync engine runs in the extension's background (outbox and mirror in IndexedDB, alarm and popup pulls, backoff, status, pause), and the tabs module publishes each browser's tabs; the popup lists other browsers' tabs; send tab works from the popup and the context menu; the options page has the P1 settings; an end-to-end suite runs Chromium and Firefox against the real server in CI. All P1 items are done; what remains for P1 is its exit criteria (a week of daily use on the `edge` image).
+- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `deploy/` (Dockerfile, Compose files, proxy examples; see [deploy/README.md](deploy/README.md)), `scripts/`, `docs/`, `.github/`. The image pipeline builds, smoke-tests and scans every PR and publishes `edge` from `main`. `apps/extension` has the WXT scaffold for three targets and onboarding: create an account, sign in with username and passphrase, recover with the recovery key, lock, sign-out and revoked states (see [apps/extension/README.md](apps/extension/README.md)); `packages/core` has the API client and account flows they use. The sync engine runs in the extension's background (outbox and mirror in IndexedDB, alarm and popup pulls, backoff, status, pause), and the tabs module publishes each browser's tabs; the popup lists other browsers' tabs; send tab works from the popup and the context menu; the options page has the P1 settings; an end-to-end suite runs Chromium and Firefox against the real server in CI. All P1 items are done; what remains for P1 is its exit criteria (a week of daily use on the `edge` image).
 - The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
@@ -61,7 +61,7 @@ deploy/              see deploy/README.md
   k8s/               (planned, P6) example manifests (one replica + PVC)
 docs/
   srs/               requirements (sections 1–6)
-  adr/               architecture decision records (0001–0009)
+  adr/               architecture decision records (0001–0010)
   guides/            self-hosting.md, server-configuration.md (generated); user and contributor docs follow
 scripts/             repository maintenance scripts (license check)
 .github/
@@ -130,7 +130,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 - [x] **Compose files:** `docker-compose.yml` and `docker-compose.caddy.yml` with `.env.example` and resource limits. Reverse-proxy docs for Caddy, Traefik and nginx. Warning about local storage and a single instance (DEP-17…19, DEP-22).
 - [x] **CI image pipeline:** build on every PR plus a container smoke test (health, API suite, SIGTERM, restart persistence); vulnerability scan; multi-arch with Buildx; publish `edge` and `sha-*` to GHCR from `main` with minimal token permissions (DEP-28…30, DEP-33, DEP-34, DEP-38).
 - [x] **Extension scaffold:** WXT with three targets. Fixed Firefox add-on ID. CSP with `'wasm-unsafe-eval'`. Permissions as in SRS 2.7.
-- [x] **Onboarding:** create or connect an account, recovery kit, device registration (ACC-1…8, ACC-11, UI-2).
+- [x] **Onboarding:** create or connect an account, recovery kit, device registration (ACC-1…8, ACC-11, UI-2). *(Since [ADR-0010](docs/adr/0010-usernames-and-recovery-key.md): usernames for signing in and a recovery key that sets a new passphrase, instead of the recovery kit and pairing code; ACC-5, ACC-13.)*
 - [x] **Engine:** outbox in IndexedDB, debounced push, alarm and popup-triggered pull, backoff, status, pause, per-module toggles (ENG-1…14).
 - [x] **Module interface** plus an in-memory fake browser for tests. *(WXT's fake browser, plus `FakeServer` and `FakeTabsModule` in `apps/extension/src/engine/testing.ts`.)*
 - [x] **Tabs module:** publish windows and tabs; incognito, scheme and exclusion filtering; strip favicons (TAB-1…6).
@@ -156,7 +156,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 
 - [ ] Vue SPA served by the server. Sign-in with in-page key derivation; idle lock (DSH-1).
 - [ ] Overview, Tabs, History pages. Decryption and indexing in a Web Worker, cached in IndexedDB (DSH-2…4).
-- [ ] Settings: devices (rename, revoke), passphrase change by re-wrapping, recovery kit, JSON export, account deletion (DSH-7, ACC-9, ACC-10, IMP-1).
+- [ ] Settings: devices (rename, revoke), passphrase change by re-wrapping, username, new recovery key, JSON export, account deletion (DSH-7, ACC-9, ACC-10, IMP-1).
 - [ ] Security headers and CSP (SEC-8). Responsive layout (DSH-8). Stale-device handling (TAB-9).
 
 **Exit:** a fresh user goes from install to seeing a second browser's tabs and history in the dashboard in under 5 minutes, without docs.
@@ -209,7 +209,7 @@ Firefox for Android · Helm chart · push notifications instead of polling · ke
 
 From [SRS 6.5](<docs/srs/6. Other Requirements.md#65-known-limitations-and-open-questions>). Don't "fix" these casually; each needs an ADR.
 
-- A lost passphrase with no signed-in device means lost data. No server-side recovery is possible by design.
+- Losing both the passphrase and the recovery key, with no signed-in device, means lost data. No server-side recovery is possible by design ([ADR-0010](docs/adr/0010-usernames-and-recovery-key.md)).
 - A malicious server can withhold or roll back records, and can serve a backdoored dashboard.
 - Account-key rotation is manual (export, new account, import).
 - No sync for data without extension APIs: Firefox bookmark tags and keywords, tab group colours, passwords, settings.

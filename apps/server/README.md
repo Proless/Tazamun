@@ -4,7 +4,7 @@ The Tazamun sync server: a deliberately simple store of encrypted records, with 
 
 | Part | Status |
 | ---- | ------ |
-| HTTP API `/v1` ([SRS 4.4](<../../docs/srs/4. External Interface Requirements.md#44-communications-interfaces>)): info, health, accounts, prelogin, sessions, keys, devices, collections | Done |
+| HTTP API `/v1` ([SRS 4.4](<../../docs/srs/4. External Interface Requirements.md#44-communications-interfaces>)): info, health, accounts, usernames, prelogin, recovery key, sessions, keys, devices, collections | Done |
 | Configuration from `TAZAMUN_*` variables and an optional JSON file, validated, with `*_FILE` secrets and a generated reference (ADM-1, DEP-12…15) | Done |
 | Migrations on startup with a backup first; refuses newer databases (ADM-4, DEP-24) | Done |
 | Quotas, rate limits, registration modes (ADM-2, ADM-3, SEC-9) | Done |
@@ -94,7 +94,8 @@ src/
   config.ts          every TAZAMUN_* setting, validation, reference renderer
   config-docs.ts     writes docs/guides/server-configuration.md
   log.ts             JSON/pretty logger whose fields can't hold bodies, tokens or IDs
-  secrets.ts         hashing, constant-time compare, tokens, instance secret, fake prelogin salts
+  secrets.ts         hashing, constant-time compare, tokens, instance secret, fake prelogin account IDs
+                     and salts
   version.ts         server version and minClientVersion
   db/
     database.ts      the only module that touches node:sqlite
@@ -105,7 +106,7 @@ src/
     rate-limit.ts    in-memory token buckets
     validate.ts      body and parameter validation that never echoes values
   routes/
-    accounts.ts      create, prelogin, delete
+    accounts.ts      create, prelogin by username, account info, username, delete, recovery key
     sessions.ts      sessions, keys, devices
     collections.ts   pull and push
 test/

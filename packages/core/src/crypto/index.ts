@@ -24,4 +24,15 @@ export {
 } from './keys.ts';
 export type { AccountKeys } from './keys.ts';
 export { decryptPayload, encryptPayload } from './record.ts';
+export {
+  RECOVERY_KEY_BYTES,
+  RecoveryKeyFormatError,
+  deriveRecoveryKeys,
+  formatRecoveryKey,
+  generateRecoveryKey,
+  parseRecoveryKey,
+  unwrapAccountKeyWithRecovery,
+  wrapAccountKeyForRecovery,
+} from './recovery.ts';
+export type { RecoveryKeys } from './recovery.ts';
 export type { RecordAddress } from './record.ts';

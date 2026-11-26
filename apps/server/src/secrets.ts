@@ -1,6 +1,6 @@
 /**
  * Server-side secrets: token and auth-key hashing (SEC-4), the instance secret (DEP-11) and fake
- * prelogin values for unknown accounts (SEC-9). The server never sees keys that decrypt data.
+ * prelogin values for unknown usernames (SEC-9). The server never sees keys that decrypt data.
  */
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -62,6 +62,17 @@ export function loadInstanceSecret(dataDir: string, configured: string | undefin
     return new TextEncoder().encode(readFileSync(path, 'utf8').trim());
   }
   return new TextEncoder().encode(secret);
+}
+
+/**
+ * A fake but stable account ID for an unknown username (SEC-9), so prelogin answers the same way
+ * whether or not the username exists. Its salt then comes from `fakeSalt`.
+ */
+export function fakeAccountId(instanceSecret: Uint8Array, username: string): string {
+  const mac = createHmac('sha256', instanceSecret)
+    .update(`tazamun/prelogin-account|${username}`)
+    .digest();
+  return mac.subarray(0, tzCrypto.ACCOUNT_ID_BYTES).toString('base64url');
 }
 
 /**

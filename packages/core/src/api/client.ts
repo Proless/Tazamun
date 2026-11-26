@@ -92,12 +92,20 @@ export class ApiClient {
     return this.#json('POST', '/v1/accounts', schema.createAccountResponse, body);
   }
 
-  prelogin(accountId: string): Promise<schema.PreloginResponse> {
-    return this.#json(
-      'GET',
-      `/v1/accounts/${encodeURIComponent(accountId)}/prelogin`,
-      schema.preloginResponse,
-    );
+  prelogin(username: string): Promise<schema.PreloginResponse> {
+    const body: schema.PreloginRequest = { username };
+    return this.#json('POST', '/v1/prelogin', schema.preloginResponse, body);
+  }
+
+  /** The signed-in account: username and whether a recovery key is set. */
+  account(): Promise<schema.AccountResponse> {
+    return this.#json('GET', '/v1/accounts/me', schema.accountResponse);
+  }
+
+  /** ACC-13: set or change the username. `USERNAME_TAKEN` if another account has it. */
+  async updateUsername(username: string): Promise<void> {
+    const body: schema.UpdateUsernameRequest = { username };
+    await this.#send('PUT', '/v1/accounts/me/username', body);
   }
 
   async deleteAccount(body: schema.DeleteAccountRequest): Promise<void> {
@@ -135,6 +143,21 @@ export class ApiClient {
   /** ACC-8: revoke a device; its token stops working immediately. */
   async revokeDevice(deviceId: string): Promise<void> {
     await this.#send('DELETE', `/v1/devices/${encodeURIComponent(deviceId)}`);
+  }
+
+  // ---- Recovery (ACC-5) -----------------------------------------------------------------------
+
+  /** Set or replace the recovery key (signed in; needs the current auth key). */
+  async setRecovery(body: schema.SetRecoveryRequest): Promise<void> {
+    await this.#send('PUT', '/v1/recovery', body);
+  }
+
+  recoveryKey(body: schema.RecoveryKeyRequest): Promise<schema.RecoveryKeyResponse> {
+    return this.#json('POST', '/v1/recovery/key', schema.recoveryKeyResponse, body);
+  }
+
+  async recoverPassphrase(body: schema.RecoverPassphraseRequest): Promise<void> {
+    await this.#send('POST', '/v1/recovery/passphrase', body);
   }
 
   // ---- Collections -----------------------------------------------------------------------------

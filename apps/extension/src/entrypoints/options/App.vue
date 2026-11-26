@@ -84,10 +84,12 @@ async function setUp(): Promise<void> {
         <dd>
           <code>{{ state.account.serverUrl }}</code>
         </dd>
-        <dt>{{ t('optionsAccountId') }}</dt>
-        <dd>
-          <code>{{ state.account.accountId }}</code>
-        </dd>
+        <template v-if="state.account.username">
+          <dt>{{ t('optionsUsername') }}</dt>
+          <dd>
+            <code>{{ state.account.username }}</code>
+          </dd>
+        </template>
       </dl>
       <div class="actions">
         <button type="button" @click="setUp">{{ t('optionsSignInAgain') }}</button>
@@ -119,10 +121,6 @@ async function setUp(): Promise<void> {
         <dt>{{ t('optionsServer') }}</dt>
         <dd>
           <code>{{ state.account.serverUrl }}</code>
-        </dd>
-        <dt>{{ t('optionsAccountId') }}</dt>
-        <dd>
-          <code>{{ state.account.accountId }}</code>
         </dd>
       </dl>
       <SignedInSettings :account="state.account" @sign-out="doSignOut" @changed="load" />

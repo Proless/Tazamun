@@ -1,15 +1,17 @@
 <script setup lang="ts">
-// UI-2: create or connect an account, choose modules, recovery kit (SRS 3.1, ACC-1…8).
-// Validation and error mapping live in src/onboarding/form.ts; flows in src/account/session.ts.
+// UI-2: create an account, sign in, or recover with the recovery key; choose modules; show the
+// recovery key once (SRS 3.1, ACC-1…8, ACC-13). Validation and error mapping live in
+// src/onboarding/form.ts; flows in src/account/session.ts.
 import { computed, onMounted, ref } from 'vue';
 import { browser } from 'wxt/browser';
 import { account } from '@tazamun/core';
-import RecoveryKit from '../../components/RecoveryKit.vue';
+import RecoveryKey from '../../components/RecoveryKey.vue';
 import {
   OnboardingError,
   checkServer,
   connectAndSignIn,
   createAndSignIn,
+  recoverAndSignIn,
   requestServerPermission,
   thisDevice,
 } from '../../account/session.ts';
@@ -18,15 +20,16 @@ import { t } from '../../lib/i18n.ts';
 import {
   STRENGTH_KEYS,
   errorKey,
-  parseServerStep,
-  validateAccountId,
+  parseServerInput,
   validateDeviceName,
   validateNewPassphrase,
+  validateRecoveryKey,
+  validateUsername,
   type MessageKey,
 } from '../../onboarding/form.ts';
 
-type Mode = 'create' | 'connect';
-type Step = 'welcome' | 'server' | 'device' | 'passphrase' | 'kit' | 'done';
+type Mode = 'create' | 'connect' | 'recover';
+type Step = 'welcome' | 'server' | 'device' | 'passphrase' | 'recovery' | 'done';
 
 const mode = ref<Mode>('create');
 const step = ref<Step>('welcome');
@@ -44,26 +47,27 @@ const deviceBrowser = ref({ family: 'chromium', version: '0' });
 const rememberKey = ref(true);
 const syncTabs = ref(true);
 
-// Passphrase step
-const accountIdInput = ref('');
-const accountIdKnown = ref(false);
+// Credentials step
+const username = ref('');
 const passphrase = ref('');
 const confirmation = ref('');
 const acknowledged = ref(false);
 const invite = ref('');
+const recoveryKeyInput = ref('');
 
-// Result
-const accountId = ref('');
+// Result (create): shown once, never stored (ACC-5).
+const recoveryKey = ref('');
+const recoverySaved = ref(false);
 
 /** Set up before on this browser (signed out or revoked): offer to sign in again. */
-const previous = ref<{ serverUrl: string; accountId: string } | undefined>();
+const previous = ref<{ serverUrl: string; username: string | undefined } | undefined>();
 /** ACC-12: this profile has (or had) an account; another one would replace it here. */
 const existingServer = ref<string | undefined>();
 
 const strength = computed(() => account.estimateStrength(passphrase.value));
 const steps = computed<Step[]>(() =>
   mode.value === 'create'
-    ? ['server', 'device', 'passphrase', 'kit']
+    ? ['server', 'device', 'passphrase', 'recovery']
     : ['server', 'device', 'passphrase'],
 );
 const stepNumber = computed(() => steps.value.indexOf(step.value) + 1);
@@ -79,7 +83,7 @@ onMounted(async () => {
   rememberKey.value = settings.rememberKey;
   syncTabs.value = settings.modules.tabs;
   if (state.status === 'disconnected') {
-    previous.value = { serverUrl: state.account.serverUrl, accountId: state.account.accountId };
+    previous.value = { serverUrl: state.account.serverUrl, username: state.account.username };
   }
   existingServer.value = state.account?.serverUrl;
 });
@@ -96,30 +100,35 @@ function back(): void {
   step.value = index <= 0 ? 'welcome' : (steps.value[index - 1] ?? 'welcome');
 }
 
+/** On the credentials step: switch between signing in and recovering (ACC-5). */
+function switchMode(next: 'connect' | 'recover'): void {
+  mode.value = next;
+  error.value = undefined;
+  passphrase.value = '';
+  confirmation.value = '';
+}
+
 /**
  * Server step. The permission request must be the first browser call in the click handler, before
  * any `await`, or the browser refuses it for lack of a user gesture.
  */
 async function submitServer(): Promise<void> {
   error.value = undefined;
-  const parsed = parseServerStep(mode.value, serverInput.value);
+  const parsed = parseServerInput(serverInput.value);
   if (!parsed.ok) {
     error.value = parsed.error;
     return;
   }
-  const granted = requestServerPermission(browser, parsed.value.serverUrl);
+  const granted = requestServerPermission(browser, parsed.value);
   busy.value = 'server';
   try {
     if (!(await granted)) throw new OnboardingError('permission-denied');
-    const info = await checkServer(browser, parsed.value.serverUrl);
+    const info = await checkServer(browser, parsed.value);
     if (mode.value === 'create' && info.registration === 'closed') {
       throw new OnboardingError('registration-closed');
     }
     inviteNeeded.value = info.registration === 'invite';
-    serverUrl.value = parsed.value.serverUrl;
-    const fromCode = parsed.value.accountId;
-    if (fromCode !== undefined) accountIdInput.value = fromCode;
-    accountIdKnown.value = fromCode !== undefined;
+    serverUrl.value = parsed.value;
     step.value = 'device';
   } catch (err) {
     error.value = errorKey(err);
@@ -128,11 +137,12 @@ async function submitServer(): Promise<void> {
   }
 }
 
-/** "Sign in again": the server and account are known; the permission may need asking again. */
+/** "Sign in again": the server and username are known; the permission may need asking again. */
 async function reconnect(): Promise<void> {
   if (previous.value === undefined) return;
   mode.value = 'connect';
-  serverInput.value = account.formatPairingCode(previous.value);
+  serverInput.value = previous.value.serverUrl;
+  username.value = previous.value.username ?? '';
   await submitServer();
 }
 
@@ -152,51 +162,73 @@ async function submitDevice(): Promise<void> {
   step.value = 'passphrase';
 }
 
-async function submitPassphrase(): Promise<void> {
-  error.value = undefined;
-  const device = { name: deviceName.value, browser: deviceBrowser.value };
+/** The form's own checks, before any Argon2id run. */
+function invalidCredentials(): MessageKey | undefined {
+  const name = validateUsername(username.value);
+  if (!name.ok) return name.error;
+  username.value = name.value;
   if (mode.value === 'create') {
-    const invalid = validateNewPassphrase(passphrase.value, confirmation.value, acknowledged.value);
-    if (invalid !== undefined) {
-      error.value = invalid;
-      return;
-    }
+    return validateNewPassphrase(passphrase.value, confirmation.value, acknowledged.value);
   }
-  const id = validateAccountId(accountIdInput.value);
-  if (mode.value === 'connect' && !id.ok) {
-    error.value = id.error;
-    return;
+  if (mode.value === 'recover') {
+    const key = validateRecoveryKey(recoveryKeyInput.value);
+    if (!key.ok) return key.error;
+    // No acknowledgement: the recovery key exists, so the passphrase isn't the only way in.
+    return validateNewPassphrase(passphrase.value, confirmation.value, true);
   }
+  return undefined;
+}
+
+async function submitPassphrase(): Promise<void> {
+  error.value = invalidCredentials();
+  if (error.value !== undefined) return;
+  const device = { name: deviceName.value, browser: deviceBrowser.value };
+  const common = {
+    serverUrl: serverUrl.value,
+    username: username.value,
+    device,
+    rememberKey: rememberKey.value,
+  };
   busy.value = 'keys';
   try {
     if (mode.value === 'create') {
-      accountId.value = await createAndSignIn(browser, {
-        serverUrl: serverUrl.value,
+      recoveryKey.value = await createAndSignIn(browser, {
+        ...common,
         passphrase: passphrase.value,
         invite: invite.value.trim(),
-        device,
-        rememberKey: rememberKey.value,
       });
-      step.value = 'kit';
-    } else if (id.ok) {
-      await connectAndSignIn(browser, {
-        serverUrl: serverUrl.value,
-        accountId: id.value,
-        passphrase: passphrase.value,
-        device,
-        rememberKey: rememberKey.value,
+      step.value = 'recovery';
+    } else if (mode.value === 'recover') {
+      await recoverAndSignIn(browser, {
+        ...common,
+        recoveryKey: recoveryKeyInput.value,
+        newPassphrase: passphrase.value,
       });
-      accountId.value = id.value;
+      recoveryKeyInput.value = '';
+      step.value = 'done';
+    } else {
+      await connectAndSignIn(browser, { ...common, passphrase: passphrase.value });
       step.value = 'done';
     }
     // Don't keep the passphrase in the page any longer than needed.
     passphrase.value = '';
     confirmation.value = '';
   } catch (err) {
-    error.value = errorKey(err);
+    error.value = errorKey(err, mode.value);
   } finally {
     busy.value = '';
   }
+}
+
+function finishRecovery(): void {
+  if (!recoverySaved.value) {
+    error.value = 'errorRecoverySaved';
+    return;
+  }
+  error.value = undefined;
+  // Gone from the page once it's saved (ACC-5: never stored).
+  recoveryKey.value = '';
+  step.value = 'done';
 }
 
 function closeTab(): void {
@@ -241,9 +273,7 @@ function closeTab(): void {
     <form v-else-if="step === 'server'" novalidate @submit.prevent="submitServer">
       <h1>{{ t('serverHeading') }}</h1>
       <p>{{ t('serverLead') }}</p>
-      <label for="server">
-        {{ mode === 'create' ? t('serverUrlLabel') : t('serverOrPairingLabel') }}
-      </label>
+      <label for="server">{{ t('serverUrlLabel') }}</label>
       <input
         id="server"
         v-model="serverInput"
@@ -251,11 +281,10 @@ function closeTab(): void {
         inputmode="url"
         autocomplete="url"
         spellcheck="false"
-        :placeholder="mode === 'create' ? 'https://sync.example.org' : 'tazamun:…@https://…'"
+        placeholder="https://sync.example.org"
         required
         autofocus
       />
-      <p v-if="mode === 'connect'" class="muted hint">{{ t('serverOrPairingHelp') }}</p>
       <p class="muted hint">{{ t('serverPermissionNote') }}</p>
       <p v-if="busy === 'server'" role="status">{{ t('serverChecking') }}</p>
       <div class="nav">
@@ -296,24 +325,58 @@ function closeTab(): void {
       </div>
     </form>
 
-    <!-- Passphrase -->
+    <!-- Credentials: create, sign in, or recover -->
     <form v-else-if="step === 'passphrase'" novalidate @submit.prevent="submitPassphrase">
-      <template v-if="mode === 'create'">
-        <h1>{{ t('passphraseHeading') }}</h1>
-        <p>{{ t('passphraseLead') }}</p>
-        <template v-if="inviteNeeded">
-          <label for="invite">{{ t('inviteLabel') }}</label>
-          <input id="invite" v-model="invite" type="text" spellcheck="false" autocomplete="off" />
-          <p class="muted hint">{{ t('inviteHelp') }}</p>
-        </template>
-        <label for="passphrase">{{ t('passphraseLabel') }}</label>
+      <h1 v-if="mode === 'create'">{{ t('passphraseHeading') }}</h1>
+      <h1 v-else-if="mode === 'recover'">{{ t('recoverHeading') }}</h1>
+      <h1 v-else>{{ t('signInHeading') }}</h1>
+      <p v-if="mode === 'create'">{{ t('passphraseLead') }}</p>
+      <p v-else-if="mode === 'recover'">{{ t('recoverLead') }}</p>
+
+      <label for="username">{{ t('usernameLabel') }}</label>
+      <input
+        id="username"
+        v-model="username"
+        type="text"
+        spellcheck="false"
+        autocapitalize="none"
+        autocomplete="username"
+        maxlength="64"
+        required
+      />
+      <p v-if="mode === 'create'" class="muted hint">{{ t('usernameHelp') }}</p>
+
+      <template v-if="mode === 'create' && inviteNeeded">
+        <label for="invite">{{ t('inviteLabel') }}</label>
+        <input id="invite" v-model="invite" type="text" spellcheck="false" autocomplete="off" />
+        <p class="muted hint">{{ t('inviteHelp') }}</p>
+      </template>
+
+      <template v-if="mode === 'recover'">
+        <label for="recovery-key">{{ t('recoveryKeyLabel') }}</label>
         <input
-          id="passphrase"
-          v-model="passphrase"
-          type="password"
-          autocomplete="new-password"
+          id="recovery-key"
+          v-model="recoveryKeyInput"
+          type="text"
+          spellcheck="false"
+          autocapitalize="characters"
+          autocomplete="off"
+          placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
           required
         />
+      </template>
+
+      <label for="passphrase">
+        {{ mode === 'recover' ? t('newPassphraseLabel') : t('passphraseLabel') }}
+      </label>
+      <input
+        id="passphrase"
+        v-model="passphrase"
+        type="password"
+        :autocomplete="mode === 'connect' ? 'current-password' : 'new-password'"
+        required
+      />
+      <template v-if="mode !== 'connect'">
         <div class="strength" aria-live="polite">
           <meter min="0" max="4" low="2" high="3" optimum="4" :value="strength.score"></meter>
           <span>{{ t(STRENGTH_KEYS[strength.score]) }}</span>
@@ -327,52 +390,52 @@ function closeTab(): void {
           autocomplete="new-password"
           required
         />
-        <label class="check warning">
-          <input v-model="acknowledged" type="checkbox" />
-          <span>{{ t('passphraseAcknowledge') }}</span>
-        </label>
       </template>
-      <template v-else>
-        <h1>{{ t('signInHeading') }}</h1>
-        <template v-if="!accountIdKnown">
-          <label for="account-id">{{ t('accountIdLabel') }}</label>
-          <input
-            id="account-id"
-            v-model="accountIdInput"
-            type="text"
-            spellcheck="false"
-            autocomplete="username"
-            required
-          />
-        </template>
-        <label for="passphrase">{{ t('passphraseLabel') }}</label>
-        <input
-          id="passphrase"
-          v-model="passphrase"
-          type="password"
-          autocomplete="current-password"
-          required
-        />
-      </template>
+      <label v-if="mode === 'create'" class="check warning">
+        <input v-model="acknowledged" type="checkbox" />
+        <span>{{ t('passphraseAcknowledge') }}</span>
+      </label>
+
+      <p v-if="mode === 'connect'" class="hint">
+        <button type="button" class="link" @click="switchMode('recover')">
+          {{ t('forgotPassphrase') }}
+        </button>
+      </p>
+      <p v-else-if="mode === 'recover'" class="hint">
+        <button type="button" class="link" @click="switchMode('connect')">
+          {{ t('backToSignIn') }}
+        </button>
+      </p>
+
       <p v-if="busy === 'keys'" role="status">{{ t('deriving') }}</p>
       <div class="nav">
         <button type="button" class="secondary" :disabled="busy !== ''" @click="back">
           {{ t('onboardingBack') }}
         </button>
         <button type="submit" :disabled="busy !== ''">
-          {{ mode === 'create' ? t('createButton') : t('signInButton') }}
+          {{
+            mode === 'create'
+              ? t('createButton')
+              : mode === 'recover'
+                ? t('recoverButton')
+                : t('signInButton')
+          }}
         </button>
       </div>
     </form>
 
-    <!-- Recovery kit (create only) -->
-    <section v-else-if="step === 'kit'">
-      <h1 class="no-print">{{ t('kitHeading') }}</h1>
-      <p class="no-print">{{ t('kitLead') }}</p>
-      <RecoveryKit :server-url="serverUrl" :account-id="accountId" />
+    <!-- Recovery key (create only), shown once -->
+    <section v-else-if="step === 'recovery'">
+      <h1 class="no-print">{{ t('recoveryHeading') }}</h1>
+      <p class="no-print">{{ t('recoveryLead') }}</p>
+      <RecoveryKey :info="{ serverUrl, username, recoveryKey }" />
+      <label class="check no-print">
+        <input v-model="recoverySaved" type="checkbox" />
+        <span>{{ t('recoverySaved') }}</span>
+      </label>
       <div class="nav no-print">
         <span></span>
-        <button type="button" @click="step = 'done'">{{ t('onboardingContinue') }}</button>
+        <button type="button" @click="finishRecovery">{{ t('onboardingContinue') }}</button>
       </div>
     </section>
 

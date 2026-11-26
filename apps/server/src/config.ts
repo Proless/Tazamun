@@ -73,7 +73,7 @@ export const SETTINGS = {
   authRateLimitPerMinute: {
     env: 'TAZAMUN_AUTH_RATE_LIMIT_PER_MINUTE',
     description:
-      'Attempts per minute for sign-in, account creation, prelogin and passphrase checks, counted per client IP and, where an account is named, per account.',
+      'Attempts per minute for sign-in, account creation, prelogin, recovery and passphrase checks, counted per client IP and, where an account is named, per account.',
     format: 'integer ≥ 1',
     default: '10',
     schema: positiveInt(1_000_000),
@@ -111,7 +111,7 @@ export const SETTINGS = {
   instanceSecret: {
     env: 'TAZAMUN_INSTANCE_SECRET',
     description:
-      'Secret used to make prelogin responses for unknown accounts look real and stay stable. If unset, one is generated into `<data dir>/instance-secret` on first start. Changing it changes those responses.',
+      'Secret used to make prelogin responses for unknown usernames look real and stay stable. If unset, one is generated into `<data dir>/instance-secret` on first start. Changing it changes those responses.',
     format: 'at least 32 characters',
     secret: true,
     schema: z.string().min(32),

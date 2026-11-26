@@ -8,6 +8,8 @@ import { MemoryStore } from '../engine/store.ts';
 import { FakeServer } from '../engine/testing.ts';
 import { TabsModule } from '../modules/tabs/module.ts';
 import {
+  changeUsername,
+  loadAccountInfo,
   orderDevices,
   parseExclusionText,
   renameThisDevice,
@@ -15,13 +17,16 @@ import {
   setModuleEnabled,
 } from './settings.ts';
 
+const ACCOUNT_ID = tzCrypto.randomId();
+
 beforeEach(async () => {
   fakeBrowser.reset();
   await saveSignedIn(
     browser,
     {
       serverUrl: 'https://sync.example.org',
-      accountId: tzCrypto.randomId(),
+      accountId: ACCOUNT_ID,
+      username: 'hasan',
       deviceId: 'dev_A',
       deviceName: 'Old name',
       token: tzCrypto.toBase64Url(tzCrypto.randomBytes(32)),
@@ -47,6 +52,35 @@ function respond(status: number, body?: unknown) {
   vi.stubGlobal('fetch', fetch);
   return fetch;
 }
+
+describe('username (ACC-13)', () => {
+  it('changes the username on the server and here', async () => {
+    const fetch = respond(204);
+    expect(await changeUsername(browser, ' Hasan.D ')).toEqual({ ok: true, username: 'hasan.d' });
+    const call = fetch.mock.calls[0];
+    expect(call?.[0]).toBe('https://sync.example.org/v1/accounts/me/username');
+    expect(JSON.parse(call?.[1].body as string)).toEqual({ username: 'hasan.d' });
+    expect((await getAccountState(browser)).account?.username).toBe('hasan.d');
+  });
+
+  it('refuses an invalid username without calling the server, and reports a taken one', async () => {
+    const fetch = respond(409, { error: { code: 'USERNAME_TAKEN', message: 'Taken' } });
+    expect(await changeUsername(browser, 'a')).toEqual({ ok: false, error: 'invalid' });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(await changeUsername(browser, 'other')).toEqual({ ok: false, error: 'taken' });
+    expect((await getAccountState(browser)).account?.username).toBe('hasan');
+  });
+
+  it('keeps the username the server reports', async () => {
+    respond(200, { accountId: ACCOUNT_ID, username: 'renamed', recoveryKey: false });
+    expect(await loadAccountInfo(browser)).toEqual({
+      accountId: ACCOUNT_ID,
+      username: 'renamed',
+      recoveryKey: false,
+    });
+    expect((await getAccountState(browser)).account?.username).toBe('renamed');
+  });
+});
 
 describe('device name and devices (ACC-7, ACC-8)', () => {
   it('renames this device on the server and locally', async () => {

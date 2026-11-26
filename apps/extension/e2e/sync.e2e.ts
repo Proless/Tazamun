@@ -12,6 +12,7 @@ import {
   createAccount,
   openUrls,
   popup,
+  recoverAccount,
   sendFromPopup,
   status,
   waitFor,
@@ -22,7 +23,8 @@ let server: TestServer;
 let site: Awaited<ReturnType<typeof startSite>>;
 let a: Device;
 let b: Device;
-let pairingCode: string;
+let recoveryKey: string;
+const USERNAME = 'e2e-user';
 
 // E2E_BROWSER_B=chromium forces the fallback (two Chromium profiles).
 const firefox = process.env['E2E_BROWSER_B'] === 'chromium' ? undefined : findFirefox();
@@ -68,10 +70,10 @@ async function otherTabsText(device: Device): Promise<string> {
 }
 
 describe(`P1 end to end: Chromium A and ${bLabel}`, () => {
-  it('creates an account on A and connects B with the pairing code (SRS 3.1)', async () => {
-    pairingCode = await createAccount(a, server.address, 'Chromium A');
-    expect(pairingCode).toMatch(/^tazamun:[A-Za-z0-9_-]{22}@http:\/\/localhost:\d+$/);
-    await connectAccount(b, pairingCode, bLabel);
+  it('creates an account on A and signs B in with the username (SRS 3.1, ACC-13)', async () => {
+    recoveryKey = await createAccount(a, server.address, 'E2E-User', 'Chromium A');
+    expect(recoveryKey).toMatch(/^[0-9A-Z]{4}(-[0-9A-Z]{4}){7}$/);
+    await connectAccount(b, server.address, USERNAME, bLabel);
     const devices = (await (
       await fetch(`${server.url}/v1/devices`, {
         headers: {
@@ -193,9 +195,25 @@ describe(`P1 end to end: Chromium A and ${bLabel}`, () => {
     expect(kept.token).toBeUndefined();
   }, 120_000);
 
-  it('never logs URLs, titles or tokens on the server (rule 5)', () => {
+  it('recovers B with the recovery key; every other browser signs out (ACC-5)', async () => {
+    const NEW = 'a brand new passphrase for b';
+    await recoverAccount(b, server.address, USERNAME, recoveryKey, NEW);
+    const kept = await b.ext<{ token?: string; username?: string }>(
+      `api.storage.local.get('account').then((s) => s.account)`,
+    );
+    expect(kept.token).toBeDefined();
+    expect(kept.username).toBe(USERNAME);
+    // A's session ended with the new passphrase (as after a passphrase change, ACC-9).
+    const page = await popup(a);
+    await page.waitForText('removed from your account', 20_000);
+    await page.close();
+  }, 180_000);
+
+  it('never logs URLs, titles, usernames or keys on the server (rule 5)', () => {
     expect(server.log).not.toContain('/from-a');
     expect(server.log).not.toContain('Page ');
     expect(server.log).not.toContain('send-a-to-b');
+    expect(server.log).not.toContain(USERNAME);
+    expect(server.log).not.toContain(recoveryKey);
   });
 });

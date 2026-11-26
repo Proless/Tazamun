@@ -1,11 +1,11 @@
 <script setup lang="ts">
-// UI-3 for a signed-in device: this browser (name ACC-7, remember key SEC-5), sync (status,
-// pause, modules with PRIV-2), excluded sites (PRIV-3), devices (revoke ACC-8), recovery kit
-// (ACC-5) and sign out (ACC-11). Logic is in src/options/settings.ts.
+// UI-3 for a signed-in device: account (username ACC-13, recovery key ACC-5), this browser
+// (name ACC-7, remember key SEC-5), sync (status, pause, modules with PRIV-2), excluded sites
+// (PRIV-3), devices (revoke ACC-8) and sign out (ACC-11). Logic is in src/options/settings.ts.
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { browser } from 'wxt/browser';
 import type { schema } from '@tazamun/core';
-import RecoveryKit from './RecoveryKit.vue';
+import RecoveryKey from './RecoveryKey.vue';
 import { loadDevices } from '../account/devices.ts';
 import { getSettings, setRememberKey, type StoredAccount } from '../account/store.ts';
 import type { EngineStatus } from '../engine/engine.ts';
@@ -15,6 +15,9 @@ import { t, uiLocale } from '../lib/i18n.ts';
 import { readStatus, requestSync, togglePaused, watchStatus } from '../lib/sync-client.ts';
 import { formatLastSeen } from '../modules/tabs/view.ts';
 import {
+  changeUsername,
+  loadAccountInfo,
+  newRecoveryKey,
   orderDevices,
   parseExclusionText,
   renameThisDevice,
@@ -22,6 +25,8 @@ import {
   saveExclusions,
   setModuleEnabled,
   type ActionResult,
+  type RecoveryKeyResult,
+  type UsernameResult,
 } from '../options/settings.ts';
 
 const props = defineProps<{ account: StoredAccount }>();
@@ -38,6 +43,13 @@ const exclusionsText = ref('');
 const exclusionsSaved = ref(false);
 const invalidExclusions = ref<string[]>([]);
 const devices = ref<schema.Device[] | undefined>();
+const accountInfo = ref<schema.AccountResponse | undefined>();
+const usernameInput = ref(props.account.username ?? '');
+const usernameResult = ref<UsernameResult | undefined>();
+const recoveryAsking = ref(false);
+const recoveryPassphrase = ref('');
+const recoveryBusy = ref(false);
+const recoveryResult = ref<RecoveryKeyResult | undefined>();
 const deviceError = ref(false);
 let stopWatching: (() => void) | undefined;
 
@@ -63,7 +75,69 @@ onMounted(async () => {
   });
   status.value = await readStatus(browser);
   await loadSettings();
-  devices.value = await loadDevices(browser);
+  const [info, list] = await Promise.all([loadAccountInfo(browser), loadDevices(browser)]);
+  accountInfo.value = info;
+  if (info !== undefined && info.username !== null) usernameInput.value = info.username;
+  devices.value = list;
+});
+
+// ---- Account -----------------------------------------------------------------------------------
+
+/** ACC-13: undefined while unknown (offline); null for an account from before usernames. */
+const currentUsername = computed(() =>
+  accountInfo.value === undefined ? props.account.username : accountInfo.value.username,
+);
+
+async function saveUsername(): Promise<void> {
+  usernameResult.value = await changeUsername(browser, usernameInput.value);
+  if (usernameResult.value.ok) {
+    usernameInput.value = usernameResult.value.username;
+    if (accountInfo.value !== undefined) {
+      accountInfo.value = { ...accountInfo.value, username: usernameResult.value.username };
+    }
+    emit('changed');
+  } else if (usernameResult.value.error === 'signed-out') {
+    emit('changed');
+  }
+}
+
+const usernameError = computed(() => {
+  const r = usernameResult.value;
+  if (r === undefined || r.ok) return undefined;
+  if (r.error === 'invalid') return t('errorUsernameInvalid');
+  if (r.error === 'taken') return t('errorUsernameTaken');
+  return t('errorGeneric');
+});
+
+/** ACC-5: a new recovery key, shown once. Needs the passphrase (one Argon2id run). */
+async function makeRecoveryKey(): Promise<void> {
+  recoveryBusy.value = true;
+  try {
+    recoveryResult.value = await newRecoveryKey(browser, recoveryPassphrase.value);
+  } finally {
+    recoveryBusy.value = false;
+    recoveryPassphrase.value = '';
+  }
+  if (recoveryResult.value.ok) {
+    recoveryAsking.value = false;
+    if (accountInfo.value !== undefined) {
+      accountInfo.value = { ...accountInfo.value, recoveryKey: true };
+    }
+  } else if (recoveryResult.value.error === 'signed-out') {
+    emit('changed');
+  }
+}
+
+function hideRecoveryKey(): void {
+  recoveryResult.value = undefined;
+}
+
+const recoveryError = computed(() => {
+  const r = recoveryResult.value;
+  if (r === undefined || r.ok) return undefined;
+  if (r.error === 'wrong-passphrase') return t('unlockWrongPassphrase');
+  if (r.error === 'locked') return t('optionsRecoveryLocked');
+  return t('errorGeneric');
 });
 
 onUnmounted(() => {
@@ -144,6 +218,73 @@ async function revoke(device: schema.Device): Promise<void> {
 </script>
 
 <template>
+  <section class="no-print">
+    <h2>{{ t('optionsUsername') }}</h2>
+    <p v-if="currentUsername === null" role="alert" class="warning-box">
+      {{ t('optionsUsernameMissing') }}
+    </p>
+    <form novalidate @submit.prevent="saveUsername">
+      <label for="username">{{ t('usernameLabel') }}</label>
+      <div class="inline">
+        <input
+          id="username"
+          v-model="usernameInput"
+          type="text"
+          spellcheck="false"
+          autocapitalize="none"
+          autocomplete="username"
+          maxlength="64"
+        />
+        <button type="submit" class="secondary">{{ t('optionsUsernameSave') }}</button>
+      </div>
+      <p class="muted hint">{{ t('optionsUsernameHelp') }}</p>
+      <p v-if="usernameResult?.ok" role="status" class="hint">{{ t('optionsSaved') }}</p>
+      <p v-else-if="usernameError" role="alert" class="error">{{ usernameError }}</p>
+    </form>
+  </section>
+
+  <section>
+    <h2 class="no-print">{{ t('optionsRecoveryHeading') }}</h2>
+    <template v-if="recoveryResult?.ok">
+      <p class="no-print warning-box">{{ t('optionsRecoveryShown') }}</p>
+      <RecoveryKey
+        :info="{
+          serverUrl: account.serverUrl,
+          username: currentUsername ?? '',
+          recoveryKey: recoveryResult.recoveryKey,
+        }"
+      />
+      <div class="actions no-print spaced">
+        <button type="button" @click="hideRecoveryKey">{{ t('recoverySaved') }}</button>
+      </div>
+    </template>
+    <template v-else>
+      <p v-if="accountInfo?.recoveryKey === false" role="alert" class="no-print warning-box">
+        {{ t('optionsRecoveryMissing') }}
+      </p>
+      <p v-else-if="accountInfo?.recoveryKey" class="muted hint no-print">
+        {{ t('optionsRecoverySet') }}
+      </p>
+      <form v-if="recoveryAsking" class="no-print" novalidate @submit.prevent="makeRecoveryKey">
+        <label for="recovery-passphrase">{{ t('optionsRecoveryPassphrase') }}</label>
+        <div class="inline">
+          <input
+            id="recovery-passphrase"
+            v-model="recoveryPassphrase"
+            type="password"
+            autocomplete="current-password"
+          />
+          <button type="submit" :disabled="recoveryBusy">{{ t('optionsRecoveryNew') }}</button>
+        </div>
+        <p v-if="recoveryBusy" role="status">{{ t('deriving') }}</p>
+      </form>
+      <button v-else type="button" class="secondary no-print" @click="recoveryAsking = true">
+        {{ t('optionsRecoveryNew') }}
+      </button>
+      <p v-if="recoveryError" role="alert" class="error no-print">{{ recoveryError }}</p>
+    </template>
+  </section>
+
   <section class="no-print">
     <h2>{{ t('optionsThisBrowser') }}</h2>
     <form novalidate @submit.prevent="rename">
@@ -245,11 +386,6 @@ async function revoke(device: schema.Device): Promise<void> {
     <p v-if="deviceError" role="alert" class="error">{{ t('errorGeneric') }}</p>
   </section>
 
-  <section>
-    <h2 class="no-print">{{ t('kitHeading') }}</h2>
-    <RecoveryKit :server-url="account.serverUrl" :account-id="account.accountId" />
-  </section>
-
   <section class="no-print">
     <h2>{{ t('optionsSignOut') }}</h2>
     <p class="muted hint">{{ t('optionsSignOutHelp') }}</p>
@@ -289,6 +425,16 @@ textarea {
   color: inherit;
   background: transparent;
   margin-block: 0.5rem;
+}
+
+.warning-box {
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: var(--warning-bg);
+}
+
+.spaced {
+  margin-block-start: 1rem;
 }
 
 .confirm {

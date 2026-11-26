@@ -12,7 +12,7 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 6. **Pass `browser` in, don't import it in logic.** Functions such as `onInstalled(browser, details)` take the browser as a parameter, so tests pass `wxt/browser` (the fake browser under Vitest) and nothing reaches for globals.
 7. **All UI text comes from `public/_locales/en/messages.json`** through `t()` (SRS 6.3), with a `description` for translators. Layouts use logical CSS properties (`margin-inline`, `padding-block`, `inline-size`), so right-to-left languages need no extra rules. Each page sets `lang` and `dir` through `mountPage`. Dates and times use `uiLocale()` (the `uiLocale` message, which each translation sets to its own code), never `getUILanguage()`: the browser's language differs from the loaded text whenever Tazamun has no translation for it, and the page would mix German dates into English text.
 8. **Every entry point calls `startup()` first** (pages through `mountPage`, the background directly), which sets zod to jitless mode before any parse.
-9. **Never store the passphrase, the KEK or the auth key**, not even in `storage.session`. Only the account key (where SEC-5 says) and the session token are kept, in `src/account/store.ts` only. Clear the passphrase fields once a flow finishes.
+9. **Never store the passphrase, the recovery key, a KEK or an auth key**, not even in `storage.session`. Only the account key (where SEC-5 says) and the session token are kept, in `src/account/store.ts` only. Clear the passphrase and recovery-key fields once a flow finishes; the recovery key shown after sign-up leaves the page when the user confirms it is saved.
 10. **Never capture private or incognito browsing** (rule 7), and never log URLs, titles, keys or tokens (rule 5), not even in development builds.
 
 ## Pitfalls
@@ -25,6 +25,9 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 - `fakeBrowser.reset()` leaves one blank tab open. Compare against the tabs that existed before, as `install.test.ts` does.
 
 ### Accounts and permissions
+- **Recovery ends every session, this browser's included.** `recoverAccount` sets the new passphrase (all sessions end, ACC-9), then signs in again. Other browsers get 401 and show the revoked state, whose text covers "removed or passphrase changed". Don't try to keep their sessions.
+- During recovery, `INVALID_CREDENTIALS` means a wrong recovery key or username, not a wrong passphrase; `errorKey(err, 'recover')` maps it. Pass the mode.
+- The stored `username` is optional: accounts from before ADR-0010 have none until the options page sets it (`loadAccountInfo` refreshes it from `GET /v1/accounts/me`). Code that shows or needs it must handle it missing.
 - **`permissions.request` must run before the first `await` in a click handler.** Browsers grant it only during a user gesture, and an `await` ends the gesture. `submitServer` in the onboarding page parses the URL synchronously, calls `requestServerPermission`, then awaits. Keep that order.
 - Match patterns have no port, and Firefox rejects one: request `http://localhost/*`, not `http://localhost:8080/*` (`account.hostPermissionPattern`).
 - Headless Chromium can't click the permission prompt. For an end-to-end run, load a copy of the build whose manifest already grants `http://localhost/*`; Chrome then answers `permissions.request` without a prompt.

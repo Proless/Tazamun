@@ -43,7 +43,9 @@ Read this before changing anything in `packages/core`. The repository-wide rules
 - Errors carry the HTTP status, the stable `code` and the server's message. Never put request or response bodies, tokens or keys into an error (rule 5).
 - Branch on `ApiError.code` and `NetworkError.kind`, never on message text. Unknown codes from a newer server must fall through to a generic message, not crash.
 - The flows zero the auth key after use and never return the KEK. Keep it that way: only the account key and the session token leave a flow.
-- The pairing code format (`tazamun:<accountId>@<serverUrl>`) and `normalizeServerUrl` end up in recovery kits that users print. Treat both as stored formats (rule 4): old kits must keep parsing.
+- **Stored formats people keep:** the recovery key text (`ABCD-EFGH-…`, Crockford base32) is printed and stored by users, and its derivation (`tazamun/v1/recovery/*` HKDF infos, the `recovery-account-key` AAD) opens their account. `test/vectors/tazamun-recovery-v1.json` pins both; a failing test means existing recovery keys would stop working. Usernames (`parseUsername`) are compared by the server in normalized form, so changing normalization would lock people out. Treat all three, and `normalizeServerUrl`, as stored formats (rule 4).
+- The recovery key never goes to the server, and isn't stored by any flow: `createAccount` and `createRecoveryKey` return it formatted, to show once. Only the recovery auth key (to prove it) and its SHA-256 (at creation) are sent.
+- The account ID stays the identifier in AAD and on the server. Usernames are only a lookup handle (prelogin); never bind a username into AAD or a key, or renaming would break every record.
 - The strength estimate is deliberately simple and informs only; it never rejects a passphrase of 12+ characters. Don't grow it into a dictionary (hundreds of kilobytes) without an ADR.
 
 ### TypeScript and Web Crypto

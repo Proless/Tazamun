@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { schema } from '@tazamun/core';
-import { makeHarness, newAccount, payload, rand } from '../test/harness.ts';
+import { crypto as tzCrypto, schema } from '@tazamun/core';
+import { makeHarness, newAccount, payload, rand, sha256b64 } from '../test/harness.ts';
 
 function errorCode(json: unknown): string {
   return schema.errorResponse.parse(json).error.code;
@@ -119,25 +119,161 @@ describe('account creation (ADM-2)', () => {
   });
 });
 
-describe('prelogin (SEC-9)', () => {
-  it('returns the stored salt and parameters for a real account', async () => {
+describe('prelogin (SEC-9, ACC-13)', () => {
+  it('returns the account ID, stored salt and parameters for a real username', async () => {
     const h = makeHarness();
     const a = newAccount();
     await h.call('POST', '/v1/accounts', { body: a.body });
-    const res = await h.call('GET', `/v1/accounts/${a.accountId}/prelogin`);
-    expect(res.json).toEqual({ salt: a.body.salt, kdfParams: a.body.kdfParams });
+    const res = await h.call('POST', '/v1/prelogin', { body: { username: a.username } });
+    expect(res.json).toEqual({
+      accountId: a.accountId,
+      salt: a.body.salt,
+      kdfParams: a.body.kdfParams,
+    });
   });
 
-  it('returns a stable, real-looking answer for an unknown account', async () => {
+  it('returns a stable, real-looking answer for an unknown username', async () => {
     const h = makeHarness();
-    const id = newAccount().accountId;
-    const first = await h.call('GET', `/v1/accounts/${id}/prelogin`);
-    const second = await h.call('GET', `/v1/accounts/${id}/prelogin`);
+    const first = await h.call('POST', '/v1/prelogin', { body: { username: 'nobody' } });
+    const second = await h.call('POST', '/v1/prelogin', { body: { username: 'nobody' } });
     expect(first.status).toBe(200);
     expect(first.json).toEqual(second.json);
     const parsed = schema.preloginResponse.parse(first.json);
-    const other = await h.call('GET', `/v1/accounts/${newAccount().accountId}/prelogin`);
-    expect(schema.preloginResponse.parse(other.json).salt).not.toBe(parsed.salt);
+    const other = await h.call('POST', '/v1/prelogin', { body: { username: 'someone' } });
+    const otherParsed = schema.preloginResponse.parse(other.json);
+    expect(otherParsed.salt).not.toBe(parsed.salt);
+    expect(otherParsed.accountId).not.toBe(parsed.accountId);
+  });
+
+  it('accepts only normalized usernames', async () => {
+    const h = makeHarness();
+    const res = await h.call('POST', '/v1/prelogin', { body: { username: 'Hasan' } });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('usernames (ACC-13)', () => {
+  it('refuses a taken username without using up the invite', async () => {
+    const h = makeHarness({ registration: 'invite' });
+    const first = newAccount(h.invite(), 'hasan');
+    expect((await h.call('POST', '/v1/accounts', { body: first.body })).status).toBe(201);
+    const invite = h.invite();
+    const taken = await h.call('POST', '/v1/accounts', { body: newAccount(invite, 'hasan').body });
+    expect(taken.status).toBe(409);
+    expect(errorCode(taken.json)).toBe('USERNAME_TAKEN');
+    const other = await h.call('POST', '/v1/accounts', { body: newAccount(invite, 'other').body });
+    expect(other.status).toBe(201);
+  });
+
+  it('sets and changes the username of an account, refusing one taken by another', async () => {
+    const h = makeHarness();
+    const a = await h.signUp();
+    const b = await h.signUp('dev_B');
+    const me = await h.call('GET', '/v1/accounts/me', { token: a.token });
+    expect(me.json).toEqual({ accountId: a.accountId, username: a.username, recoveryKey: true });
+    const taken = await h.call('PUT', '/v1/accounts/me/username', {
+      token: a.token,
+      body: { username: b.username },
+    });
+    expect(errorCode(taken.json)).toBe('USERNAME_TAKEN');
+    const same = await h.call('PUT', '/v1/accounts/me/username', {
+      token: a.token,
+      body: { username: a.username },
+    });
+    expect(same.status).toBe(204);
+    const renamed = await h.call('PUT', '/v1/accounts/me/username', {
+      token: a.token,
+      body: { username: 'renamed' },
+    });
+    expect(renamed.status).toBe(204);
+    expect(h.db.getAccountByUsername('renamed')?.id).toBe(a.accountId);
+    expect(h.db.getAccountByUsername(a.username)).toBeUndefined();
+  });
+});
+
+describe('recovery key (ACC-5)', () => {
+  it('hands out the recovery-wrapped key only for the right recovery auth key', async () => {
+    const h = makeHarness();
+    const a = await h.signUp();
+    const wrong = await h.call('POST', '/v1/recovery/key', {
+      body: { username: a.username, recoveryAuthKey: rand(32) },
+    });
+    expect(wrong.status).toBe(401);
+    expect(errorCode(wrong.json)).toBe('INVALID_CREDENTIALS');
+    const unknown = await h.call('POST', '/v1/recovery/key', {
+      body: { username: 'nobody', recoveryAuthKey: a.recoveryAuthKey },
+    });
+    expect(unknown.json).toEqual(wrong.json);
+    const right = await h.call('POST', '/v1/recovery/key', {
+      body: { username: a.username, recoveryAuthKey: a.recoveryAuthKey },
+    });
+    expect(right.json).toEqual({
+      accountId: a.accountId,
+      wrappedAccountKey: a.body.recoveryWrappedAccountKey,
+    });
+  });
+
+  it('sets a new passphrase and ends every session', async () => {
+    const h = makeHarness();
+    const a = await h.signUp();
+    const authKey = rand(32);
+    const res = await h.call('POST', '/v1/recovery/passphrase', {
+      body: {
+        username: a.username,
+        recoveryAuthKey: a.recoveryAuthKey,
+        salt: rand(16),
+        kdfParams: a.body.kdfParams,
+        authHash: sha256b64(tzCrypto.fromBase64Url(authKey)),
+        wrappedAccountKey: rand(60),
+      },
+    });
+    expect(res.status).toBe(204);
+    expect((await h.call('GET', '/v1/keys', { token: a.token })).status).toBe(401);
+    await expect(h.signIn(a, 'dev_B')).rejects.toThrow();
+    await expect(h.signIn({ ...a, authKey }, 'dev_B')).resolves.toBeTypeOf('string');
+  });
+
+  it('replaces the recovery key with the passphrase', async () => {
+    const h = makeHarness();
+    const a = await h.signUp();
+    const next = rand(32);
+    const body = {
+      recoveryAuthHash: sha256b64(tzCrypto.fromBase64Url(next)),
+      recoveryWrappedAccountKey: rand(60),
+    };
+    const wrong = await h.call('PUT', '/v1/recovery', {
+      token: a.token,
+      body: { authKey: rand(32), ...body },
+    });
+    expect(errorCode(wrong.json)).toBe('INVALID_CREDENTIALS');
+    const ok = await h.call('PUT', '/v1/recovery', {
+      token: a.token,
+      body: { authKey: a.authKey, ...body },
+    });
+    expect(ok.status).toBe(204);
+    const old = await h.call('POST', '/v1/recovery/key', {
+      body: { username: a.username, recoveryAuthKey: a.recoveryAuthKey },
+    });
+    expect(old.status).toBe(401);
+    const fresh = await h.call('POST', '/v1/recovery/key', {
+      body: { username: a.username, recoveryAuthKey: next },
+    });
+    expect(fresh.status).toBe(200);
+  });
+
+  it('rate-limits recovery attempts per account', async () => {
+    const h = makeHarness({ authRateLimitPerMinute: 3 });
+    const a = newAccount();
+    await h.call('POST', '/v1/accounts', { body: a.body });
+    let last = 0;
+    for (let i = 0; i < 5; i++) {
+      const res = await h.call('POST', '/v1/recovery/key', {
+        headers: { 'x-test-ip': `198.51.100.${String(i)}` },
+        body: { username: a.username, recoveryAuthKey: rand(32) },
+      });
+      last = res.status;
+    }
+    expect(last).toBe(429);
   });
 });
 
@@ -511,7 +647,10 @@ describe('privacy of errors and logs (rule 5, ADM-7)', () => {
       token: u.token,
       body: [{ id: recordId, payload: body }],
     });
-    await h.call('GET', `/v1/accounts/${u.accountId}/prelogin`);
+    await h.call('POST', '/v1/prelogin', { body: { username: u.username } });
+    await h.call('POST', '/v1/recovery/key', {
+      body: { username: u.username, recoveryAuthKey: u.recoveryAuthKey },
+    });
     await h.call('PUT', '/v1/devices/dev_Secret', {
       token: u.token,
       body: { name: 'My secret name' },
@@ -521,6 +660,8 @@ describe('privacy of errors and logs (rule 5, ADM-7)', () => {
       u.token,
       u.accountId,
       u.authKey,
+      u.username,
+      u.recoveryAuthKey,
       recordId,
       body,
       'dev_Secret',
@@ -528,7 +669,8 @@ describe('privacy of errors and logs (rule 5, ADM-7)', () => {
     ]) {
       expect(all).not.toContain(value);
     }
-    expect(all).toContain('/v1/accounts/:id/prelogin');
+    expect(all).toContain('/v1/prelogin');
+    expect(all).toContain('/v1/recovery/key');
     expect(all).toContain('/v1/collections/:name');
   });
 

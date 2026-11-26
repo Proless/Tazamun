@@ -72,8 +72,8 @@ One server hosts any number of accounts. Each person creates their own account w
    - `open`: anyone who can reach the server can create an account. Use it only on a private network.
    - `closed`: no new accounts, for example once everyone has joined. Existing accounts keep working.
 2. **Size the quota.** `TAZAMUN_STORAGE_QUOTA_MB` limits each account (default 200 MiB). Tabs and the extension list stay under 1 MB, bookmarks about 3 MB for 5,000 of them, and a year of history 30–60 MB. Plan disk space for the number of accounts times what they actually use (`accounts list` shows it), not times the quota.
-3. **Tell people what you can see.** You can't read tabs, history or bookmarks, but you can see account IDs, device names (they are stored in plaintext, [ADR-0009](../adr/0009-device-names-and-key-storage.md)), browser families and versions, how much each account stores, when it last synced, and IP addresses in proxy logs.
-4. **Removing someone:** they find their account ID in Tazamun's settings or their recovery kit. `accounts delete <id> --yes` deletes the account, its devices and its data, after writing a backup.
+3. **Tell people what you can see.** You can't read tabs, history or bookmarks, but you can see usernames and account IDs, device names (they are stored in plaintext, [ADR-0009](../adr/0009-device-names-and-key-storage.md)), browser families and versions, how much each account stores, when it last synced, and IP addresses in proxy logs.
+4. **Removing someone:** `tazamun accounts list` shows each account's ID next to its username. `accounts delete <id> --yes` deletes the account, its devices and its data, after writing a backup.
 
 Nobody, including you, can reset a forgotten passphrase. If someone forgets theirs and has no browser still signed in, their data is lost. The fix is a new account (send a new invite) and an `accounts delete` of the old one.
 
