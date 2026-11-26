@@ -11,9 +11,7 @@ const BROWSERS: TargetBrowser[] = ['chrome', 'edge', 'firefox'];
 describe('manifestFor (SRS 2.7, 6.2)', () => {
   it.each(BROWSERS)('%s: requests exactly the P1 permissions, the rest optional', (browser) => {
     const m = manifestFor(browser);
-    expect(m.permissions.sort()).toEqual(
-      ['alarms', 'contextMenus', 'notifications', 'storage', 'tabs', 'unlimitedStorage'].sort(),
-    );
+    expect(m.permissions.sort()).toEqual(['alarms', 'storage', 'tabs', 'unlimitedStorage'].sort());
     expect(m.optional_permissions.sort()).toEqual(['bookmarks', 'history', 'management']);
     // Host access only through the optional, per-origin grant for the user's server.
     expect(m).not.toHaveProperty('host_permissions');

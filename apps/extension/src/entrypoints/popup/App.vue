@@ -1,11 +1,10 @@
 <script setup lang="ts">
 // UI-1: account state (ACC-11, SEC-5), sync status with "Sync now" and "Pause" (ENG-5, ENG-12,
-// ENG-13), "Send this tab" (TAB-7) and other devices' tabs (TAB-6).
+// ENG-13) and other devices' tabs (TAB-6), checked every few seconds while open (PERF-1).
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { browser } from 'wxt/browser';
 import type { schema } from '@tazamun/core';
 import OtherTabs from '../../components/OtherTabs.vue';
-import SendTab from '../../components/SendTab.vue';
 import { loadDevices } from '../../account/devices.ts';
 import type { SyncRecord } from '../../engine/module.ts';
 import { refreshAccountState } from '../../account/session.ts';
@@ -27,6 +26,14 @@ const status = ref<EngineStatus | undefined>();
 const tabs = ref<SyncRecord<schema.TabsData>[]>([]);
 const devices = ref<schema.Device[] | undefined>();
 let stopWatching: (() => void) | undefined;
+let poll: ReturnType<typeof setInterval> | undefined;
+
+/**
+ * PERF-1: while the popup is open, check for changes this often. With TAB-5's 5 s debounce on the
+ * other side, a change shows within about 12 s. Each check is one `GET /v1/info` when nothing
+ * changed, and it respects the backoff.
+ */
+const POLL_MS = 5_000;
 
 const host = computed(() => {
   const url = state.value?.account?.serverUrl;
@@ -51,8 +58,11 @@ onMounted(async () => {
   status.value = await readStatus(browser);
   if (state.value.status !== 'signed-in') return;
   await loadTabs();
-  // ENG-5: opening the popup checks for changes right away (PERF-1: within 5 s).
+  // ENG-5: opening the popup checks for changes right away, then every POLL_MS (PERF-1).
   void requestSync(browser);
+  poll = setInterval(() => {
+    void requestSync(browser, 'poll');
+  }, POLL_MS);
   devices.value = await loadDevices(browser);
 });
 
@@ -62,6 +72,7 @@ async function loadTabs(): Promise<void> {
 
 onUnmounted(() => {
   stopWatching?.();
+  if (poll !== undefined) clearInterval(poll);
 });
 
 async function setUp(): Promise<void> {
@@ -126,7 +137,6 @@ async function togglePause(): Promise<void> {
           {{ t('popupOpenSettings') }}
         </button>
       </div>
-      <SendTab :devices="devices" :self-id="state.account.deviceId" />
       <OtherTabs :records="tabs" :devices="devices" :self-id="state.account.deviceId" />
     </template>
   </main>

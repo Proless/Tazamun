@@ -33,18 +33,26 @@ export function syncableFavicon(url: string | undefined): string | undefined {
   return url.startsWith('https://') ? url : undefined;
 }
 
+export interface BuildOptions {
+  readonly exclusions: readonly Exclusion[];
+  /** TAB-2, PRIV-1: the user's choice for this browser; off by default. */
+  readonly includePrivate: boolean;
+}
+
 export function buildTabsData(
   windows: readonly BrowserWindow[],
-  exclusions: readonly Exclusion[],
+  options: BuildOptions,
 ): schema.TabsData {
+  const { exclusions, includePrivate } = options;
   const result: schema.TabWindow[] = [];
   for (const window of windows) {
-    // TAB-2 (PRIV-1): private windows never leave the device, not even as an empty window.
-    if (window.incognito) continue;
+    // TAB-2 (PRIV-1): unless the user chose otherwise, private windows never leave the device,
+    // not even as an empty window.
+    if (window.incognito && !includePrivate) continue;
     if (window.type !== undefined && window.type !== 'normal') continue;
     const tabs: schema.Tab[] = [];
     for (const tab of [...(window.tabs ?? [])].sort((a, b) => a.index - b.index)) {
-      if (tab.incognito) continue;
+      if (tab.incognito && !includePrivate) continue;
       const url = tab.url;
       // TAB-3: privileged, local and excluded URLs are dropped.
       if (url === undefined || !isSyncableUrl(url, exclusions)) continue;
@@ -58,7 +66,13 @@ export function buildTabsData(
         ...(favIconUrl === undefined ? {} : { favIconUrl }),
       });
     }
-    if (tabs.length > 0) result.push({ focused: window.focused, tabs });
+    if (tabs.length > 0) {
+      result.push({
+        focused: window.focused,
+        ...(window.incognito ? { private: true } : {}),
+        tabs,
+      });
+    }
   }
   return { windows: result };
 }

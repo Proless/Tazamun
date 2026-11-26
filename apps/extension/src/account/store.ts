@@ -43,6 +43,11 @@ const settings = z.object({
   /** PRIV-3, TAB-3: sites that never leave this device (patterns: `src/lib/exclusions.ts`). */
   exclusions: z.array(z.string().max(500)).max(1000).default([]),
   modules: z.object({ tabs: z.boolean().default(true) }).prefault({}),
+  /**
+   * PRIV-1: per module, whether private and incognito windows are included on this browser. Off
+   * by default; it takes effect only once the browser allows the extension in private windows.
+   */
+  includePrivate: z.object({ tabs: z.boolean().default(false) }).prefault({}),
 });
 export type Settings = z.infer<typeof settings>;
 
@@ -173,15 +178,14 @@ export async function markSignedOut(
  */
 export async function forgetAccount(browser: WxtBrowser): Promise<void> {
   await clearAccountKey(browser);
-  await browser.storage.local.remove([
-    ACCOUNT_KEY,
-    'engineStatus',
-    'devices',
-    // The commands module's queues (src/modules/commands/module.ts).
-    'commandsOutgoing',
-    'commandsToDelete',
-    'commandsDone',
-  ]);
+  await browser.storage.local.remove([ACCOUNT_KEY, 'engineStatus', 'devices', ...LEGACY_KEYS]);
+}
+
+/** Left behind by versions with send tab (removed, ADR-0011); `removeLegacyData` clears them. */
+export const LEGACY_KEYS = ['commandsOutgoing', 'commandsToDelete', 'commandsDone'] as const;
+
+export async function removeLegacyData(browser: WxtBrowser): Promise<void> {
+  await browser.storage.local.remove([...LEGACY_KEYS]);
 }
 
 async function readAccountKey(browser: WxtBrowser): Promise<Uint8Array<ArrayBuffer> | undefined> {

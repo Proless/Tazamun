@@ -12,8 +12,9 @@ Each ADR records one decision that is hard to reverse: the context, the decision
 | [0006](0006-bookmark-safety.md) | Bookmark safety: diff against a mirror, snapshots, mass-deletion guard | Accepted |
 | [0007](0007-container-distribution.md) | One container image, built and published only by CI | Accepted |
 | [0008](0008-crypto-implementation.md) | Crypto implementation: Web Crypto plus hash-wasm, and the details SEC-1…3 leave open | Accepted |
-| [0009](0009-device-names-and-key-storage.md) | Device names in plaintext; the account key is remembered by default (Q2, Q3) | Accepted |
+| [0009](0009-device-names-and-key-storage.md) | Device names in plaintext; the account key is remembered by default (Q2, Q3) | Accepted; send-tab mentions superseded by 0011 |
 | [0010](0010-usernames-and-recovery-key.md) | Usernames for signing in, and a recovery key instead of the recovery kit | Accepted |
+| [0011](0011-private-browsing-choice-and-no-send-tab.md) | Private browsing is the user's choice; send tab is removed | Accepted |
 
 Template for new ADRs:
 

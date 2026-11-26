@@ -509,82 +509,6 @@
       }
     }
   },
-  "menuSendPage": {
-    "message": "Send page to",
-    "description": "Context menu parent item on a page (UI-4)."
-  },
-  "menuSendLink": {
-    "message": "Send link to",
-    "description": "Context menu parent item on a link (UI-4)."
-  },
-  "menuNoDevices": {
-    "message": "No other browsers connected",
-    "description": "Disabled context menu item when there is no other device."
-  },
-  "sentTabTitle": {
-    "message": "Tab from $DEVICE$",
-    "description": "Notification title when a tab was sent to this browser (TAB-7).",
-    "placeholders": {
-      "device": {
-        "content": "$1",
-        "example": "Firefox on Work laptop"
-      }
-    }
-  },
-  "sentTabRefusedTitle": {
-    "message": "Tab from $DEVICE$ couldn't be opened",
-    "description": "Notification title when the browser refused to open a sent tab (TAB-8).",
-    "placeholders": {
-      "device": {
-        "content": "$1",
-        "example": "Firefox on Work laptop"
-      }
-    }
-  },
-  "sentTabRefused": {
-    "message": "This browser can't open $URL$. Copy the address from here if you need it.",
-    "description": "Notification text when a sent tab was refused (TAB-8).",
-    "placeholders": {
-      "url": {
-        "content": "$1",
-        "example": "https://example.org"
-      }
-    }
-  },
-  "sendHeading": {
-    "message": "Send this tab",
-    "description": "Popup section heading (TAB-7)."
-  },
-  "sendTo": {
-    "message": "Send to $DEVICE$",
-    "description": "Button: send the current tab to that device.",
-    "placeholders": {
-      "device": {
-        "content": "$1",
-        "example": "Firefox on Work laptop"
-      }
-    }
-  },
-  "sendSent": {
-    "message": "Sent. It opens there within a minute or two.",
-    "description": "Shown after sending a tab (PERF-2: within 90 s)."
-  },
-  "sendPrivate": {
-    "message": "Tabs from private windows aren't sent.",
-    "description": "Shown when the current tab is in a private window."
-  },
-  "sendNotWebPage": {
-    "message": "Only web pages can be sent.",
-    "description": "Shown when the current tab is a browser or local page."
-  },
-  "sendNoDevices": {
-    "message": "Connect another browser to send tabs to it.",
-    "description": "Shown when there's no other device."
-  },
-  "sendFailed": {
-    "message": "The tab couldn't be sent. Try again.",
-    "description": "Shown when sending failed."
-  },
   "optionsThisBrowser": {
     "message": "This browser",
     "description": "Options section heading."
@@ -816,5 +740,21 @@
   "optionsRecoveryShown": {
     "message": "Save this key now. It is shown only once, and the previous one no longer works.",
     "description": "Options: shown with a newly made recovery key."
+  },
+  "tabsPrivateWindow": {
+    "message": "private window",
+    "description": "Popup: label of a window on another browser that is a private or incognito window."
+  },
+  "privateWindowsTabs": {
+    "message": "Include private windows",
+    "description": "Options: checkbox under the tabs module to also publish tabs of private or incognito windows on this browser."
+  },
+  "privateWindowsHelp": {
+    "message": "Off by default. When on, tabs in private windows of this browser are synced too, marked as private. Your other browsers can see them.",
+    "description": "Options: help below the private windows checkbox."
+  },
+  "privateWindowsNotAllowed": {
+    "message": "Your browser doesn’t let Tazamun into private windows yet, so none are synced. Chrome and Edge: open the extensions page, choose Details under Tazamun, and turn on “Allow in Incognito” (Edge: “Allow in InPrivate”). Firefox: open Add-ons and themes, choose Tazamun, and set “Run in Private Windows” to Allow.",
+    "description": "Options: shown when private windows are switched on but the browser doesn’t allow the extension in them."
   }
 }

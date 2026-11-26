@@ -12,6 +12,8 @@ import {
   loadAccountInfo,
   orderDevices,
   parseExclusionText,
+  privateAccessAllowed,
+  setIncludePrivate,
   renameThisDevice,
   revokeDevice,
   setModuleEnabled,
@@ -127,6 +129,23 @@ describe('device name and devices (ACC-7, ACC-8)', () => {
     expect(
       orderDevices([d('b', 'Zed'), d('c', 'Alpha'), d('a', 'Me', true)]).map((x) => x.id),
     ).toEqual(['a', 'c', 'b']);
+  });
+});
+
+describe('private windows (PRIV-1, TAB-2)', () => {
+  it('is off by default and switches per module', async () => {
+    expect((await getSettings(browser)).includePrivate.tabs).toBe(false);
+    await setIncludePrivate(browser, 'tabs', true);
+    expect((await getSettings(browser)).includePrivate.tabs).toBe(true);
+    await setIncludePrivate(browser, 'tabs', false);
+    expect((await getSettings(browser)).includePrivate.tabs).toBe(false);
+  });
+
+  it('reads whether the browser allows the extension in private windows', async () => {
+    fakeBrowser.extension.isAllowedIncognitoAccess = () => Promise.resolve(true);
+    expect(await privateAccessAllowed(browser)).toBe(true);
+    fakeBrowser.extension.isAllowedIncognitoAccess = () => Promise.reject(new Error('n/a'));
+    expect(await privateAccessAllowed(browser)).toBe(false);
   });
 });
 

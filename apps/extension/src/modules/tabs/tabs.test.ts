@@ -69,6 +69,8 @@ describe('exclusions (TAB-3, PRIV-3)', () => {
   });
 });
 
+const OFF = { exclusions: [], includePrivate: false };
+
 describe('buildTabsData (TAB-1…4)', () => {
   it('publishes windows and tabs in tab order', () => {
     const data = buildTabsData(
@@ -81,7 +83,7 @@ describe('buildTabsData (TAB-1…4)', () => {
           { focused: true },
         ),
       ],
-      [],
+      OFF,
     );
     expect(data).toEqual({
       windows: [
@@ -103,16 +105,36 @@ describe('buildTabsData (TAB-1…4)', () => {
     expect(schema.COLLECTIONS.tabs.data.safeParse(data).success).toBe(true);
   });
 
-  it('never publishes private windows or tabs, not even as empty windows (TAB-2)', () => {
+  it('leaves private windows and tabs out by default, not even as empty windows (TAB-2)', () => {
     const data = buildTabsData(
       [
         win([tab('https://secret.example/')], { incognito: true }),
         win([tab('https://also-secret.example/', { incognito: true }), tab('https://ok.example/')]),
       ],
-      [],
+      OFF,
     );
     expect(JSON.stringify(data)).not.toContain('secret');
     expect(data.windows).toHaveLength(1);
+  });
+
+  it('includes private windows, marked as such, when the user turned that on (TAB-2)', () => {
+    const data = buildTabsData(
+      [
+        win([tab('https://private.example/', { incognito: true })], { incognito: true }),
+        win([tab('https://bank.example/', { incognito: true })], { incognito: true }),
+        win([tab('https://ok.example/')]),
+      ],
+      { exclusions: parseExclusions(['bank.example']), includePrivate: true },
+    );
+    // Exclusions and schemes still apply (TAB-3, PRIV-3).
+    expect(data.windows).toEqual([
+      expect.objectContaining({
+        private: true,
+        tabs: [expect.objectContaining({ url: 'https://private.example/' })],
+      }),
+      expect.not.objectContaining({ private: true }),
+    ]);
+    expect(schema.COLLECTIONS.tabs.data.safeParse(data).success).toBe(true);
   });
 
   it('drops privileged, local and excluded URLs, and windows left empty (TAB-3)', () => {
@@ -122,7 +144,7 @@ describe('buildTabsData (TAB-1…4)', () => {
         win([tab('file:///etc/passwd'), tab('https://bank.example/'), tab('https://ok.example/')]),
         win([tab('https://ok.example/')], { type: 'popup' }),
       ],
-      parseExclusions(['bank.example']),
+      { exclusions: parseExclusions(['bank.example']), includePrivate: false },
     );
     expect(data.windows.map((w) => w.tabs.map((t) => t.url))).toEqual([['https://ok.example/']]);
   });
@@ -136,7 +158,7 @@ describe('buildTabsData (TAB-1…4)', () => {
     expect(syncableFavicon(`https://example.org/${'a'.repeat(600)}`)).toBeUndefined();
     const data = buildTabsData(
       [win([tab('https://a.example/', { favIconUrl: 'data:image/png;base64,AAAA' })])],
-      [],
+      OFF,
     );
     expect(data.windows[0]?.tabs[0]).not.toHaveProperty('favIconUrl');
   });

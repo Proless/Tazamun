@@ -43,8 +43,9 @@ These come from the design and never change. A pull request that breaks one won'
 4. **Browser events are never the source of truth.** They trigger a diff against the local mirror.
 5. **Never log plaintext:** no URLs, titles, keys, tokens, passphrases or history record IDs, on the client or on the server.
 6. **Never destroy user data without a recoverable copy** (snapshots, tombstones, the deletion guard).
-7. **Never capture private or incognito browsing.**
-8. **Hard-to-reverse decisions get an ADR.**
+7. **Hard-to-reverse decisions get an ADR.**
+
+Private and incognito windows are synced only when the user turns that on per module and allows the extension there in the browser ([ADR-0011](docs/adr/0011-private-browsing-choice-and-no-send-tab.md)). The default is off; keep it that way.
 
 Also:
 
@@ -58,7 +59,7 @@ Also:
 - Use [Conventional Commits](https://www.conventionalcommits.org) and reference requirement IDs:
 
   ```text
-  feat(tabs): send tab to device (TAB-7)
+  feat(tabs): include private windows on request (TAB-2)
   fix(core): reject payloads with a newer schema version (ENG-10)
   docs(srs): clarify tombstone expiry (HIS-8)
   ```

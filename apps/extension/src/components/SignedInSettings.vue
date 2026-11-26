@@ -19,6 +19,8 @@ import {
   loadAccountInfo,
   newRecoveryKey,
   orderDevices,
+  privateAccessAllowed,
+  setIncludePrivate,
   parseExclusionText,
   renameThisDevice,
   revokeDevice,
@@ -36,6 +38,8 @@ const status = ref<EngineStatus | undefined>();
 const paused = ref(false);
 const rememberKey = ref(true);
 const tabsOn = ref(true);
+const tabsPrivate = ref(false);
+const privateAllowed = ref(true);
 const confirmingTabsOff = ref(false);
 const deviceName = ref(props.account.deviceName);
 const nameResult = ref<ActionResult | undefined>();
@@ -66,6 +70,8 @@ async function loadSettings(): Promise<void> {
   paused.value = settings.paused;
   rememberKey.value = settings.rememberKey;
   tabsOn.value = settings.modules.tabs;
+  tabsPrivate.value = settings.includePrivate.tabs;
+  privateAllowed.value = await privateAccessAllowed(browser);
   exclusionsText.value = settings.exclusions.join('\n');
 }
 
@@ -177,6 +183,10 @@ function onTabsToggle(): void {
     tabsOn.value = true;
     confirmingTabsOff.value = true;
   }
+}
+
+async function changeTabsPrivate(): Promise<void> {
+  await setIncludePrivate(browser, 'tabs', tabsPrivate.value);
 }
 
 async function turnTabsOff(deleteFromServer: boolean): Promise<void> {
@@ -326,6 +336,21 @@ async function revoke(device: schema.Device): Promise<void> {
         <span class="muted hint block">{{ t('moduleTabsHelp') }}</span>
       </span>
     </label>
+    <label class="check nested">
+      <input
+        v-model="tabsPrivate"
+        type="checkbox"
+        :disabled="!tabsOn"
+        @change="changeTabsPrivate"
+      />
+      <span>
+        {{ t('privateWindowsTabs') }}
+        <span class="muted hint block">{{ t('privateWindowsHelp') }}</span>
+      </span>
+    </label>
+    <p v-if="tabsPrivate && !privateAllowed" role="alert" class="warning-box nested">
+      {{ t('privateWindowsNotAllowed') }}
+    </p>
     <div v-if="confirmingTabsOff" class="confirm" role="alertdialog" aria-labelledby="tabs-off">
       <p id="tabs-off">{{ t('moduleOffQuestion') }}</p>
       <div class="actions">
@@ -425,6 +450,10 @@ textarea {
   color: inherit;
   background: transparent;
   margin-block: 0.5rem;
+}
+
+.nested {
+  margin-inline-start: 1.75rem;
 }
 
 .warning-box {

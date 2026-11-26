@@ -120,30 +120,3 @@ export function popup(device: Device): Promise<ExtPage> {
 export function status(device: Device): Promise<{ state: string; pending: number } | undefined> {
   return device.ext(`api.storage.local.get('engineStatus').then((s) => s.engineStatus)`);
 }
-
-/**
- * TAB-7 through the popup's "Send this tab": make the web page the active tab, then open the popup
- * (it acts on the active tab of its window) and click the target.
- */
-export async function sendFromPopup(
-  device: Device,
-  urlPrefix: string,
-  target: string,
-): Promise<void> {
-  await device.ext(`api.tabs.query({}).then(async (ts) => {
-    const t = ts.find((x) => (x.url || '').startsWith(${JSON.stringify(urlPrefix)}));
-    await api.tabs.update(t.id, { active: true });
-    return true;
-  })`);
-  const page = await popup(device);
-  // Opening the popup as a tab made it the active one; point it back at the web page.
-  await device.ext(`api.tabs.query({}).then(async (ts) => {
-    const t = ts.find((x) => (x.url || '').startsWith(${JSON.stringify(urlPrefix)}));
-    await api.tabs.update(t.id, { active: true });
-    return true;
-  })`);
-  await page.reload();
-  await page.click(`Send to ${target}`);
-  await page.waitForText('Sent.');
-  await page.close();
-}

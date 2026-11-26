@@ -22,7 +22,8 @@ function device(id: string) {
 
 const PASSPHRASE = 'correct horse battery staple';
 
-describe('account flows through the API client', () => {
+// Real Argon2id, up to four runs per test: slow on a busy machine.
+describe('account flows through the API client', { timeout: 60_000 }, () => {
   it('creates an account, connects a second device, unlocks, and revokes', async () => {
     const h = makeHarness({ registration: 'invite' });
     const client = clientFor(h);

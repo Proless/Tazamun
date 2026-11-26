@@ -2,7 +2,7 @@
 
 | Folder | What's in it |
 | ------ | ------------ |
-| [srs/](srs/) | Software Requirements Specification (revision 2). Every requirement has an ID such as `TAB-7` or `SEC-3`. |
+| [srs/](srs/) | Software Requirements Specification (revision 2). Every requirement has an ID such as `TAB-2` or `SEC-3`. |
 | [adr/](adr/README.md) | Architecture Decision Records (0001–0008): the hard-to-reverse decisions and why they were made. |
 | [guides/](guides/) | [Self-hosting](guides/self-hosting.md) and the [server configuration reference](guides/server-configuration.md) (generated). User and contributor guides follow. |
 

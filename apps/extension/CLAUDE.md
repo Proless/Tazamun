@@ -1,6 +1,6 @@
 # CLAUDE.md: apps/extension
 
-Read this before changing anything in `apps/extension`. The repository-wide rules in the [root CLAUDE.md](../../CLAUDE.md) still apply (especially rules 2, 4, 5 and 7); usage and layout are in [README.md](README.md).
+Read this before changing anything in `apps/extension`. The repository-wide rules in the [root CLAUDE.md](../../CLAUDE.md) still apply (especially rules 2, 4 and 5); usage and layout are in [README.md](README.md).
 
 ## Rules for this app
 
@@ -13,7 +13,7 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 7. **All UI text comes from `public/_locales/en/messages.json`** through `t()` (SRS 6.3), with a `description` for translators. Layouts use logical CSS properties (`margin-inline`, `padding-block`, `inline-size`), so right-to-left languages need no extra rules. Each page sets `lang` and `dir` through `mountPage`. Dates and times use `uiLocale()` (the `uiLocale` message, which each translation sets to its own code), never `getUILanguage()`: the browser's language differs from the loaded text whenever Tazamun has no translation for it, and the page would mix German dates into English text.
 8. **Every entry point calls `startup()` first** (pages through `mountPage`, the background directly), which sets zod to jitless mode before any parse.
 9. **Never store the passphrase, the recovery key, a KEK or an auth key**, not even in `storage.session`. Only the account key (where SEC-5 says) and the session token are kept, in `src/account/store.ts` only. Clear the passphrase and recovery-key fields once a flow finishes; the recovery key shown after sign-up leaves the page when the user confirms it is saved.
-10. **Never capture private or incognito browsing** (rule 7), and never log URLs, titles, keys or tokens (rule 5), not even in development builds.
+10. **Private and incognito windows stay out unless the user turned them on** for that module on this browser (`settings.includePrivate`, off by default, [ADR-0011](../../docs/adr/0011-private-browsing-choice-and-no-send-tab.md)). Never log URLs, titles, keys or tokens (rule 5), not even in development builds.
 
 ## Pitfalls
 
@@ -49,7 +49,8 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 
 ### Tabs module
 - `detectLocalChanges` reads `windows.getAll({ populate: true, windowTypes: ['normal'] })` every time; the events registered in `watch` only say "look again" (rule 4). Missed events during suspension are caught by the next alarm.
-- Incognito is filtered twice, per window and per tab (rule 7), and windows left empty aren't published, so not even the number of private windows leaks.
+- Private windows are filtered twice, per window and per tab, unless `includePrivate.tabs` is on; windows left empty aren't published, so with the switch off not even the number of private windows leaks. With it on they are published with `private: true`, exclusions still apply, and other browsers label them.
+- **The browser decides whether private windows are visible at all.** `windows.getAll` and the tab events include them only when the user allowed the extension there (*Allow in Incognito*, *Run in Private Windows*). The extension can read that (`extension.isAllowedIncognitoAccess()`), never change it, so the options page explains where to switch it on. WXT's fake browser has no `extension` API; tests stub it.
 - Other devices' tabs are never written to the browser (`apply` is empty); the popup reads them from the mirror with `readMirror`. Never open them automatically (SRS 3.3).
 - The popup must not load favicon URLs from tab records: that is a request to a third-party site (PRIV-4).
 - WXT's fake browser doesn't populate `windows.getAll` with tabs. Tests replace `fakeBrowser.windows.getAll` with their own windows.
@@ -57,15 +58,10 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 ### Options page
 - Turning a module off asks first (PRIV-2): *Turn off and delete* sends a `retire` message; the engine asks the module's `retire()` for the deletions and publishes them even though the module is now skipped. The question is inline, not `window.confirm`, because it has three answers.
 - Revoking another device is possible here because the dashboard comes only in P3. Never offer it for this device; signing out is the way.
-- Renaming updates the server first, then the stored name and the device cache, so the context menu and notifications pick it up.
+- Renaming updates the server first, then the stored name and the device cache, so the popup's device names pick it up.
 
-### Send tab (commands module)
-- Sending goes through the background (`send-tab` message, `BackgroundSync.sendTab`), which queues the command in `storage.local`. `detectLocalChanges` publishes queued commands and drops a queue entry only once the record is in the mirror (committed), so a crash publishes it again rather than losing it. Deletions after opening use the same pattern.
-- `apply` opens each command for this device at most once (`commandsDone`), because a page is applied again after a crash (REL-2). Never move the "done" write before the open: a crash would then lose the tab.
-- Validate the URL in the background too, not only in the popup: messages are input. Only `http:` and `https:` pages are sent, never from incognito tabs (rule 7).
-- The service worker has no clipboard (Chrome would need an offscreen document), so the receiving side shows a refused URL in the notification instead of copying it.
-- `contextMenus.create` reports errors through its callback and `runtime.lastError`; read it there, or Chrome logs "Unchecked runtime.lastError". Rebuild menus with `removeAll` first: items persist across service-worker restarts, and creating an existing ID fails.
-- Chrome requires `iconUrl` for notifications; it uses `ICONS` from `src/manifest.ts`. A test checks every icon file exists.
+### Popup
+- **PERF-1:** while open, the popup sends a `poll` message every 5 s. The background runs it like the alarm (`sync('alarm')`): it respects the backoff, unlike `sync-now`, so an open popup doesn't hammer a server that is down. With TAB-5's 5 s debounce on the other side, a change shows within about 12 s. Keep the interval short only in the popup; the background can't go below the 30 s alarm minimum.
 
 ### End-to-end tests
 - **Firefox runs as the installed release over WebDriver BiDi**, not Playwright's Firefox (it can't load extensions) and not `web-ext run` (it can't drive pages). `webExtension.install` loads the build; the profile's `extensions.webextensions.uuids` pref fixes the `moz-extension://` origin.
@@ -91,7 +87,7 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 - Firefox refuses `tabs.create` for privileged URLs (`about:config` and others) and restricts `file:`. Fall back to copying the URL (TAB-8).
 - Firefox's `management.getAll()` returns add-on IDs, not store slugs.
 - Chrome's `history.addUrl` can't set title or time. That's one reason history isn't written back ([ADR-0005](../../docs/adr/0005-history-stored-in-extension.md)).
-- The manifest asks for `contextMenus` on all browsers; Firefox accepts it as an alias of `menus`. Tab group APIs differ.
+- Tab group APIs differ.
 - Test **every** change on Firefox too. The Chromium end-to-end setup is easier to automate, so Firefox regressions slip through.
 
 ### Store publishing

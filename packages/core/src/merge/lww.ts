@@ -1,6 +1,6 @@
 /**
  * Whole-record last-writer-wins (ADR-0003, strategy for records owned by one device: tabs,
- * extension inventory, commands). The payload with the larger HLC wins; a tie is broken by the
+ * extension inventory). The payload with the larger HLC wins; a tie is broken by the
  * canonical JSON, so every device picks the same winner whatever order it sees the two in.
  *
  * Commutative, associative and idempotent (property-tested), which is what makes devices converge

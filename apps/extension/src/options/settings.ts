@@ -153,6 +153,35 @@ export async function setModuleEnabled(
   }
 }
 
+/**
+ * PRIV-1, TAB-2: include private and incognito windows in a module on this browser. Takes effect
+ * only while the browser allows the extension there (`privateAccessAllowed`); the next sync
+ * publishes or drops them.
+ */
+export async function setIncludePrivate(
+  browser: WxtBrowser,
+  module: ModuleId,
+  include: boolean,
+): Promise<void> {
+  const settings = await getSettings(browser);
+  await saveSettings(browser, {
+    ...settings,
+    includePrivate: { ...settings.includePrivate, [module]: include },
+  });
+}
+
+/**
+ * Whether the user allowed the extension in private windows in the browser's settings ("Allow in
+ * Incognito", "Run in Private Windows"). The extension can only read this, never change it.
+ */
+export async function privateAccessAllowed(browser: WxtBrowser): Promise<boolean> {
+  try {
+    return await browser.extension.isAllowedIncognitoAccess();
+  } catch {
+    return false;
+  }
+}
+
 /** One pattern per line. Blank lines are ignored; unusable ones are reported by line. */
 export function parseExclusionText(text: string): { patterns: string[]; invalid: string[] } {
   const patterns: string[] = [];

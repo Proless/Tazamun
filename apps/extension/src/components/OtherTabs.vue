@@ -58,8 +58,11 @@ async function openAll(w: schema.TabWindow): Promise<void> {
     <div v-for="group in groups" :key="group.deviceId" class="device">
       <h3>{{ deviceLabel(group) }}</h3>
       <div v-for="(w, i) in group.windows" :key="i" class="window">
-        <div v-if="group.windows.length > 1 || w.tabs.length > 1" class="window-head">
-          <span class="muted">{{ t('tabsWindow', [String(i + 1), String(w.tabs.length)]) }}</span>
+        <div v-if="group.windows.length > 1 || w.tabs.length > 1 || w.private" class="window-head">
+          <span class="muted">
+            {{ t('tabsWindow', [String(i + 1), String(w.tabs.length)]) }}
+            <template v-if="w.private"> · {{ t('tabsPrivateWindow') }}</template>
+          </span>
           <button type="button" class="link" @click="openAll(w)">{{ t('tabsOpenAll') }}</button>
         </div>
         <ul>

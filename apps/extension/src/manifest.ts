@@ -40,20 +40,15 @@ export const EXTENSION_PAGES_CSP = "script-src 'self' 'wasm-unsafe-eval'; object
 
 /**
  * Always granted. Each one is used in P1:
- * - `tabs`: read URLs and titles of open tabs (TAB-1); open sent tabs (TAB-7)
+ * - `tabs`: read URLs and titles of open tabs (TAB-1)
  * - `storage`, `unlimitedStorage`: settings, keys (SEC-5), outbox and mirror in IndexedDB
  * - `alarms`: the sync poll, since timers die with the background context (ENG-5)
- * - `notifications`: "a tab was sent to you" (TAB-8)
- * - `contextMenus`: "Send page/link to device" (UI-4). Firefox accepts this name for `menus`.
+ *
+ * Private windows are reached only when the user allows the extension there in the browser's own
+ * settings ("Allow in Incognito", "Run in Private Windows"); no permission here can grant that.
+ * The default `incognito: "spanning"` mode applies (PRIV-1, ADR-0011).
  */
-export const REQUIRED_PERMISSIONS = [
-  'tabs',
-  'storage',
-  'unlimitedStorage',
-  'alarms',
-  'notifications',
-  'contextMenus',
-] as const;
+export const REQUIRED_PERMISSIONS = ['tabs', 'storage', 'unlimitedStorage', 'alarms'] as const;
 
 /**
  * Requested when the user turns the module on, not at install (PRIV-2). Store reviewers look
@@ -78,8 +73,7 @@ export const OPTIONAL_HOST_PERMISSIONS = [
 ] as const;
 
 /**
- * Toolbar, extensions page, stores and notifications (Chrome requires an icon for those). The
- * files are in `public/icons/`. A placeholder until there is a real design.
+ * Toolbar, extensions page and stores. The files are in `public/icons/`. A placeholder until there is a real design.
  */
 export const ICONS = {
   '16': 'icons/16.png',

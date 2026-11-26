@@ -4,15 +4,21 @@
  */
 import type { WxtBrowser } from 'wxt/browser';
 import { getSettings, saveSettings } from '../account/store.ts';
-import type { SendResult, SyncMessage } from '../background/sync.ts';
+import type { SyncMessage } from '../background/sync.ts';
 import type { EngineStatus } from '../engine/engine.ts';
 import { openEngineStore } from '../engine/idb-store.ts';
 import type { Payload, SyncRecord } from '../engine/module.ts';
 import { STATUS_KEY, parseStatus } from '../engine/status.ts';
 
-/** ENG-5: sync now (popup opened, or the button). Resolves when the run finished. */
-export async function requestSync(browser: WxtBrowser): Promise<EngineStatus | undefined> {
-  const message: SyncMessage = { type: 'sync-now' };
+/**
+ * ENG-5: sync now (popup opened, or the button), or (`poll`) check for changes as the alarm does,
+ * respecting the backoff (PERF-1). Resolves when the run finished.
+ */
+export async function requestSync(
+  browser: WxtBrowser,
+  kind: 'sync-now' | 'poll' = 'sync-now',
+): Promise<EngineStatus | undefined> {
+  const message: SyncMessage = { type: kind };
   try {
     return parseStatus(await browser.runtime.sendMessage(message));
   } catch {
@@ -59,22 +65,5 @@ export async function readMirror<Data>(collection: string): Promise<SyncRecord<D
       .map((e) => ({ id: e.id, payload: e.payload as Payload<Data> }));
   } finally {
     store.close();
-  }
-}
-
-/** TAB-7: ask the background to send a tab to another device. */
-export async function sendTab(
-  browser: WxtBrowser,
-  target: string,
-  tab: { url: string; title?: string },
-): Promise<SendResult | undefined> {
-  const message: SyncMessage = { type: 'send-tab', target, ...tab };
-  try {
-    const result: unknown = await browser.runtime.sendMessage(message);
-    return result === 'sent' || result === 'refused' || result === 'signed-out'
-      ? result
-      : undefined;
-  } catch {
-    return undefined;
   }
 }

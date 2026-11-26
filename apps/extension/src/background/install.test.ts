@@ -22,9 +22,19 @@ describe('onInstalled (UI-2)', () => {
     expect(await openedUrls(before)).toEqual([fakeBrowser.runtime.getURL(ONBOARDING_PATH)]);
   });
 
-  it('does nothing on an extension or browser update', async () => {
+  it('opens nothing on an extension or browser update', async () => {
     await onInstalled(browser, { reason: 'update', previousVersion: '0.0.1' });
     await onInstalled(browser, { reason: 'chrome_update' });
     expect(await openedUrls(before)).toEqual([]);
+  });
+
+  it('clears what send tab left behind when the extension updates (ADR-0011)', async () => {
+    await fakeBrowser.storage.local.set({
+      commandsDone: ['x'],
+      commandsOutgoing: [],
+      settings: {},
+    });
+    await onInstalled(browser, { reason: 'update', previousVersion: '0.0.1' });
+    expect(Object.keys(await fakeBrowser.storage.local.get(null))).toEqual(['settings']);
   });
 });

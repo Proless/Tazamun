@@ -11,7 +11,7 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 ## Current status
 
 - **Phase:** P1 (engine, server, accounts, tabs). P0's exit criteria are met: workspace, tooling and CI are set up, and `packages/core` has the HLC, the record schemas and the crypto, tested in Node, Chromium and Firefox. Q1 is decided: Hono and `node:sqlite`.
-- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `deploy/` (Dockerfile, Compose files, proxy examples; see [deploy/README.md](deploy/README.md)), `scripts/`, `docs/`, `.github/`. The image pipeline builds, smoke-tests and scans every PR and publishes `edge` from `main`. `apps/extension` has the WXT scaffold for three targets and onboarding: create an account, sign in with username and passphrase, recover with the recovery key, lock, sign-out and revoked states (see [apps/extension/README.md](apps/extension/README.md)); `packages/core` has the API client and account flows they use. The sync engine runs in the extension's background (outbox and mirror in IndexedDB, alarm and popup pulls, backoff, status, pause), and the tabs module publishes each browser's tabs; the popup lists other browsers' tabs; send tab works from the popup and the context menu; the options page has the P1 settings; an end-to-end suite runs Chromium and Firefox against the real server in CI. All P1 items are done; what remains for P1 is its exit criteria (a week of daily use on the `edge` image).
+- **What exists:** `packages/core`, `apps/server` (HTTP API, config, database and migrations, admin CLI; see [apps/server/README.md](apps/server/README.md)), `deploy/` (Dockerfile, Compose files, proxy examples; see [deploy/README.md](deploy/README.md)), `scripts/`, `docs/`, `.github/`. The image pipeline builds, smoke-tests and scans every PR and publishes `edge` from `main`. `apps/extension` has the WXT scaffold for three targets and onboarding: create an account, sign in with username and passphrase, recover with the recovery key, lock, sign-out and revoked states (see [apps/extension/README.md](apps/extension/README.md)); `packages/core` has the API client and account flows they use. The sync engine runs in the extension's background (outbox and mirror in IndexedDB, alarm and popup pulls, backoff, status, pause), and the tabs module publishes each browser's tabs; the popup lists other browsers' tabs and checks for changes every 5 s while open; private windows sync only when the user turns that on; the options page has the P1 settings; an end-to-end suite runs Chromium and Firefox against the real server in CI. All P1 items are done; what remains for P1 is its exit criteria (a week of daily use on the `edge` image).
 - The SRS was rewritten on 2026-11-24 (revision 2). Diagrams are Mermaid blocks inside the SRS ([section 2.2](<docs/srs/2. Overall Description.md#22-architecture>), [2.3](<docs/srs/2. Overall Description.md#23-sync-model>)). The revision-1 PNG diagrams were deleted.
 - `docs/srs/System Feature Template.md` is the empty IEEE template, kept for reference only.
 
@@ -38,8 +38,7 @@ If the code and the SRS disagree, fix one of them in the same pull request. Don'
 4. **Never trust browser events as the source of truth.** Events trigger a diff against the mirror.
 5. **Never log plaintext,** URLs, titles, keys, tokens, passphrases or history record IDs. Not on the client, not on the server.
 6. **Never destroy user data without a recoverable copy** (snapshots, tombstones, deletion guard).
-7. **Never capture private or incognito browsing.**
-8. Every hard-to-reverse decision gets an ADR. Reference requirement IDs in commits and PRs (e.g. `feat(tabs): send tab to device (TAB-7)`).
+7. Every hard-to-reverse decision gets an ADR. Reference requirement IDs in commits and PRs (e.g. `feat(tabs): include private windows on request (TAB-2)`).
 
 ## Repository layout ([ADR-0004](docs/adr/0004-typescript-monorepo-stack.md))
 
@@ -61,7 +60,7 @@ deploy/              see deploy/README.md
   k8s/               (planned, P6) example manifests (one replica + PVC)
 docs/
   srs/               requirements (sections 1–6)
-  adr/               architecture decision records (0001–0010)
+  adr/               architecture decision records (0001–0011)
   guides/            self-hosting.md, server-configuration.md (generated); user and contributor docs follow
 scripts/             repository maintenance scripts (license check)
 .github/
@@ -133,20 +132,20 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 - [x] **Onboarding:** create or connect an account, recovery kit, device registration (ACC-1…8, ACC-11, UI-2). *(Since [ADR-0010](docs/adr/0010-usernames-and-recovery-key.md): usernames for signing in and a recovery key that sets a new passphrase, instead of the recovery kit and pairing code; ACC-5, ACC-13.)*
 - [x] **Engine:** outbox in IndexedDB, debounced push, alarm and popup-triggered pull, backoff, status, pause, per-module toggles (ENG-1…14).
 - [x] **Module interface** plus an in-memory fake browser for tests. *(WXT's fake browser, plus `FakeServer` and `FakeTabsModule` in `apps/extension/src/engine/testing.ts`.)*
-- [x] **Tabs module:** publish windows and tabs; incognito, scheme and exclusion filtering; strip favicons (TAB-1…6).
-- [x] **Send tab** through the `commands` collection, plus notifications and the context menu (TAB-7, TAB-8, UI-4).
-- [x] **Popup:** status, other devices' tabs, send tab (UI-1). **Options page:** basics (UI-3).
+- [x] **Tabs module:** publish windows and tabs; incognito, scheme and exclusion filtering; strip favicons (TAB-1…6). *(Private windows are an opt-in per browser since [ADR-0011](docs/adr/0011-private-browsing-choice-and-no-send-tab.md).)*
+- [x] ~~**Send tab** through the `commands` collection, plus notifications and the context menu (TAB-7, TAB-8, UI-4).~~ *(Built, then removed by ADR-0011; TAB-8 stays for opening tabs from the popup.)*
+- [x] **Popup:** status, other devices' tabs (UI-1), checked every 5 s while open (PERF-1). **Options page:** basics (UI-3).
 - [x] End-to-end test: two Chromium profiles and one server in Playwright; Firefox through `web-ext run`. *(Chromium A through Playwright and the installed Firefox B through WebDriver BiDi, against the real server; `web-ext run` can't drive pages. Runs in CI.)*
 - [x] Settle Q2 (encrypt device names?) and Q3 (default for remembering the key). *(Plaintext names; remember by default: [ADR-0009](docs/adr/0009-device-names-and-key-storage.md).)*
 
-**Exit:** you use it daily on 3 browsers for a week, **against your own instance running the published `edge` image with `docker-compose.caddy.yml`**. A fresh VPS goes from nothing to a healthy HTTPS instance in under 10 minutes by following the docs. PERF-1 and PERF-2 are met. Killing the server or the service worker mid-sync loses nothing (REL-3). **You uninstall your current tab tool.**
+**Exit:** you use it daily on 3 browsers for a week, **against your own instance running the published `edge` image with `docker-compose.caddy.yml`**. A fresh VPS goes from nothing to a healthy HTTPS instance in under 10 minutes by following the docs. PERF-1 is met. Killing the server or the service worker mid-sync loses nothing (REL-3). **You uninstall your current tab tool.**
 
 ### P2: History (3–4 weeks)
 
 - [ ] History record IDs via HMAC of the normalized URL (HIS-1). Write the **URL normalization** rules down and test them (see the pitfalls below).
 - [ ] Payload with capped visits and union merge, with property tests (HIS-2).
 - [ ] Chunked first import with progress UI; `onVisited` capture (HIS-3, HIS-4, PERF-3).
-- [ ] Filters for incognito, exclusions and schemes (HIS-5, PRIV-1, PRIV-3).
+- [ ] Filters for exclusions and schemes, and private windows only when the user turns that on (HIS-5, PRIV-1, PRIV-3).
 - [ ] Retention and `expiresAt`; tombstones; propagating native deletions; the "clear all" prompt (HIS-7…10).
 - [ ] Local IndexedDB index and search; popup search; `tz` address-bar keyword (HIS-11, HIS-12, UI-5).
 
@@ -248,7 +247,7 @@ Pitfalls for one app or package live in that folder's `CLAUDE.md`. The sections 
 - `history.search` with an empty `text` and `startTime: 0` caps results through `maxResults`. Page through by time windows for the import.
 - Never call `getVisits` for every URL during import; it's far too slow.
 - `onVisitRemoved` with `allHistory: true` means the user cleared everything. **Don't** forward that as 50,000 deletions (HIS-10).
-- Users visit sensitive sites. Exclusions and incognito filtering are Must requirements, not polish.
+- Users visit sensitive sites. Exclusions, and leaving private windows out unless the user turned them on (off by default, ADR-0011), are Must requirements, not polish.
 
 ### Bookmarks
 - The first sync on a browser that already has bookmarks is where duplicates come from. Match before uploading (BMK-11) and snapshot first.

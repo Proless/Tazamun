@@ -11,7 +11,7 @@
 import { z } from 'zod';
 import { hlcStamp } from './primitives.ts';
 
-export const COLLECTION_NAMES = ['tabs', 'commands', 'history', 'extensions'] as const;
+export const COLLECTION_NAMES = ['tabs', 'history', 'extensions'] as const;
 export type CollectionName = (typeof COLLECTION_NAMES)[number];
 
 /** Schema of one collection's payload data. */
