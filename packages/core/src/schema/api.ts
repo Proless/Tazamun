@@ -270,6 +270,12 @@ export const infoResponse = z.object({
    * beyond 5 minutes (`hlc.isClockSkewed`). Optional: older servers don't send it.
    */
   time: isoDateTime.optional(),
+  /**
+   * The data generation (ENG-16): changes whenever the server's database is restored from a backup.
+   * A client that saw another one pulls everything again and pushes back what the server lost.
+   * Optional: older servers don't send it.
+   */
+  generation: z.string().min(1).max(64).optional(),
   minClientVersion: z.string(),
   registration: registrationMode,
   limits: serverLimits,
