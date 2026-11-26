@@ -24,9 +24,7 @@ describe('tabs', () => {
       windows: [
         {
           focused: true,
-          tabs: [
-            tab({ lastAccessed: T, groupTitle: 'Work', favIconUrl: 'https://example.org/f.ico' }),
-          ],
+          tabs: [tab({ lastAccessed: T, favIconUrl: 'https://example.org/f.ico' })],
         },
         { focused: false, tabs: [] },
       ],
@@ -66,7 +64,6 @@ describe('tabs', () => {
         pinned: fc.boolean(),
         active: fc.boolean(),
         lastAccessed: fc.integer({ min: 0, max: 2 * T }),
-        groupTitle: fc.string(),
       },
       { requiredKeys: ['url', 'title', 'pinned', 'active'] },
     );
