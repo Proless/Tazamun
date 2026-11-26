@@ -20,6 +20,8 @@ export class FakeServer {
   /** Every request, as `METHOD /path` without the query. */
   readonly requests: string[] = [];
   minClientVersion = '0.0.0';
+  /** The server clock `/v1/info` reports (ENG-15); undefined sends none, like an older server. */
+  time: (() => number) | undefined = undefined;
   /** Make every request fail as if the network were down. */
   down = false;
   /** Answer every authenticated request with 401 (device revoked). */
@@ -62,6 +64,7 @@ export class FakeServer {
     const body: schema.InfoResponse = {
       version: '0.1.0',
       minClientVersion: this.minClientVersion,
+      ...(this.time === undefined ? {} : { time: new Date(this.time()).toISOString() }),
       registration: 'invite',
       limits: {
         maxRequestBytes: 2_097_152,

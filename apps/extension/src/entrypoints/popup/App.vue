@@ -10,7 +10,7 @@ import type { SyncRecord } from '../../engine/module.ts';
 import { refreshAccountState } from '../../account/session.ts';
 import type { AccountState } from '../../account/store.ts';
 import type { EngineStatus } from '../../engine/engine.ts';
-import { statusMessageKey } from '../../engine/status.ts';
+import { clockNotice, statusMessageKey } from '../../engine/status.ts';
 import { t, uiLocale } from '../../lib/i18n.ts';
 import { openOnboarding } from '../../lib/pages.ts';
 import {
@@ -39,6 +39,8 @@ const host = computed(() => {
   const url = state.value?.account?.serverUrl;
   return url === undefined ? '' : new URL(url).host;
 });
+
+const clock = computed(() => (status.value === undefined ? undefined : clockNotice(status.value)));
 
 const statusLine = computed(() => {
   const s = status.value;
@@ -119,6 +121,7 @@ async function togglePause(): Promise<void> {
     <template v-else>
       <p>{{ t('popupConnected', [host, state.account.deviceName]) }}</p>
       <p v-if="statusLine" role="status" class="status">{{ statusLine }}</p>
+      <p v-if="clock" role="alert" class="warning-box">{{ t(clock.key, clock.substitutions) }}</p>
       <p v-if="status && status.pending > 0" class="muted hint">
         {{ t('statusPending', [String(status.pending)]) }}
       </p>
@@ -145,6 +148,13 @@ async function togglePause(): Promise<void> {
 <style scoped>
 .popup {
   inline-size: 22rem;
+}
+
+.warning-box {
+  padding: 0.5rem 0.625rem;
+  border-radius: 6px;
+  background: var(--warning-bg);
+  font-size: 0.85rem;
 }
 
 .status {

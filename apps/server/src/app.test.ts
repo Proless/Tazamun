@@ -17,7 +17,12 @@ describe('GET /v1/health and /v1/info', () => {
   it('describes the server without auth, and adds account state when signed in', async () => {
     const h = makeHarness({ registration: 'invite' });
     const anon = schema.infoResponse.parse((await h.call('GET', '/v1/info')).json);
-    expect(anon).toMatchObject({ version: '0.1.0', registration: 'invite' });
+    expect(anon).toMatchObject({
+      version: '0.1.0',
+      registration: 'invite',
+      // ENG-15: the server's clock, for the client's skew check.
+      time: '2026-11-24T10:00:00.000Z',
+    });
     expect(anon.account).toBeUndefined();
     expect(anon.limits.maxBatchRecords).toBe(500);
 

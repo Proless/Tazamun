@@ -105,6 +105,22 @@ describe('SyncEngine', () => {
     });
   });
 
+  it('warns when this clock is more than 5 minutes off the server (ENG-15)', async () => {
+    const server = new FakeServer();
+    const a = device(server, 'dev_A');
+    server.time = () => a.clock.now;
+    expect((await a.engine.sync('alarm')).clockSkewMinutes).toBeUndefined();
+    server.time = () => a.clock.now - 12 * 60_000;
+    expect(await a.engine.sync('alarm')).toMatchObject({ state: 'idle', clockSkewMinutes: 12 });
+    server.time = () => a.clock.now + 7 * 60_000;
+    expect((await a.engine.sync('alarm')).clockSkewMinutes).toBe(-7);
+    server.time = () => a.clock.now + 4 * 60_000;
+    expect((await a.engine.sync('alarm')).clockSkewMinutes).toBeUndefined();
+    // An older server that sends no time: nothing to compare.
+    server.time = undefined;
+    expect((await a.engine.sync('alarm')).clockSkewMinutes).toBeUndefined();
+  });
+
   it('costs one GET /v1/info per alarm when nothing changed (PERF-5)', async () => {
     const server = new FakeServer();
     const a = device(server, 'dev_A');

@@ -15,7 +15,7 @@ Read this before changing anything in `packages/core`. The repository-wide rules
 ## Pitfalls
 
 ### HLC
-- Clock skew affects HLC ordering. The engine should warn when the local clock differs from the server's `Date` header by more than 5 minutes (`isClockSkewed`).
+- Clock skew affects HLC ordering. The engine warns when the local clock differs from the server's by more than 5 minutes (`isClockSkewed`, ENG-15). The server's clock comes from the `time` field of `/v1/info`, not the `Date` header: an extension can't always read response headers, and the field has millisecond resolution.
 - `receive` throws `HlcDriftError` for a remote stamp more than 24 h in the future. The engine must catch it, keep its own clock unchanged, still apply the record, and show a warning. Never adopt the remote time, or one broken clock drags every device into the future.
 - The serialized HLC format (SRS 4.4) is stored in every record and sorts as a plain string. Changing it needs a migration.
 

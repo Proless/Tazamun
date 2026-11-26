@@ -75,6 +75,7 @@ export function createApp(s: Services): Hono<AppEnv> {
     const current = c.get('session');
     const info: schema.InfoResponse = {
       version: s.version,
+      time: new Date(s.now()).toISOString(),
       minClientVersion: s.minClientVersion,
       registration: s.registration,
       limits: {

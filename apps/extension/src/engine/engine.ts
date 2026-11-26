@@ -44,6 +44,11 @@ export interface EngineStatus {
   readonly updateRequired?: boolean;
   /** A remote clock was more than 24 h ahead; its stamps were applied but not adopted. */
   readonly clockWarning?: boolean;
+  /**
+   * ENG-15: this device's clock differs from the server's by more than 5 minutes. Positive: this
+   * clock is ahead. Rounded to whole minutes.
+   */
+  readonly clockSkewMinutes?: number;
   /** Last successful sync, per collection, ms since epoch. */
   readonly lastSync: Readonly<Record<string, number>>;
   /** Last run that completed without an error. */
@@ -89,6 +94,8 @@ interface RunContext {
   readonly keys: tzCrypto.AccountKeys;
   clock: hlc.Hlc;
   clockWarning: boolean;
+  /** ENG-15, set by the info step when the skew is over the warning threshold. */
+  clockSkewMs: number | undefined;
   updateRequired: boolean;
 }
 
@@ -168,6 +175,7 @@ export class SyncEngine {
       keys: await tzCrypto.deriveAccountKeys(session.accountKey),
       clock: loadClock(meta, session.deviceId),
       clockWarning: false,
+      clockSkewMs: undefined,
       updateRequired: false,
     };
     try {
@@ -188,6 +196,9 @@ export class SyncEngine {
       return await this.#publish({
         state: 'idle',
         ...(ctx.clockWarning ? { clockWarning: true } : {}),
+        ...(ctx.clockSkewMs === undefined
+          ? {}
+          : { clockSkewMinutes: Math.round(ctx.clockSkewMs / 60_000) }),
       });
     } catch (err) {
       return this.#fail(err, ctx);
@@ -278,7 +289,14 @@ export class SyncEngine {
   // ---- 3. Pull ---------------------------------------------------------------------------------
 
   async #pullAll(ctx: RunContext): Promise<void> {
+    const sentAt = this.#deps.now();
     const info = await ctx.client.info();
+    if (info.time !== undefined) {
+      // ENG-15: compare with the moment halfway through the request, so latency doesn't count.
+      const local = (sentAt + this.#deps.now()) / 2;
+      const server = Date.parse(info.time);
+      if (hlc.isClockSkewed(local, server)) ctx.clockSkewMs = hlc.clockSkewMs(local, server);
+    }
     if (!api.isClientSupported(this.#deps.clientVersion, info.minClientVersion)) {
       throw new StopSync({ state: 'error', reason: 'UPDATE_REQUIRED', updateRequired: true });
     }
