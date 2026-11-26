@@ -15,6 +15,7 @@ Each ADR records one decision that is hard to reverse: the context, the decision
 | [0009](0009-device-names-and-key-storage.md) | Device names in plaintext; the account key is remembered by default (Q2, Q3) | Accepted; send-tab mentions superseded by 0011 |
 | [0010](0010-usernames-and-recovery-key.md) | Usernames for signing in, and a recovery key instead of the recovery kit | Accepted |
 | [0011](0011-private-browsing-choice-and-no-send-tab.md) | Private browsing is the user's choice; send tab is removed | Accepted |
+| [0012](0012-firefox-for-android-in-1-0.md) | Firefox for Android is a 1.0 target, as a partial device | Proposed |
 
 Template for new ADRs:
 
