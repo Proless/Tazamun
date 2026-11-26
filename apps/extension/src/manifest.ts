@@ -19,6 +19,13 @@ export const FIREFOX_ADDON_ID = 'tazamun@proless.github.io';
 export const FIREFOX_MIN_VERSION = '140.0';
 
 /**
+ * Firefox for Android 142: the first Android release with the same consent prompt (MOB-1,
+ * ADR-0012). Without it `web-ext lint` warns that Android can't use `data_collection_permissions`.
+ * Never lower it.
+ */
+export const FIREFOX_ANDROID_MIN_VERSION = '142.0';
+
+/**
  * Firefox's data-collection disclosure (AMO policy). Sending data to a server outside the browser
  * counts as collection even though the user runs the server and it only sees ciphertext, so it is
  * declared honestly:
@@ -98,6 +105,7 @@ export interface ManifestFields {
       strict_min_version: string;
       data_collection_permissions: { required: string[]; optional: string[] };
     };
+    gecko_android: { strict_min_version: string };
   };
 }
 
@@ -124,6 +132,7 @@ export function manifestFor(browser: TargetBrowser): ManifestFields {
           optional: [...FIREFOX_DATA_COLLECTION.optional],
         },
       },
+      gecko_android: { strict_min_version: FIREFOX_ANDROID_MIN_VERSION },
     };
   }
   return manifest;

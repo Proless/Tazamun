@@ -224,7 +224,7 @@
     "description": "Module name: tabs."
   },
   "moduleTabsHelp": {
-    "message": "See and open other browsers' tabs, and send tabs between them. Private windows are never included.",
+    "message": "See and open other browsers' tabs. Private windows are included only if you turn that on.",
     "description": "Module description: tabs."
   },
   "modulesLater": {

@@ -45,6 +45,11 @@ describe('manifestFor (SRS 2.7, 6.2)', () => {
     expect(gecko?.data_collection_permissions.required).not.toContain('technicalAndInteraction');
   });
 
+  it('requires Firefox for Android 142, the first with data-collection consent (MOB-1)', () => {
+    const android = manifestFor('firefox').browser_specific_settings?.gecko_android;
+    expect(android?.strict_min_version).toBe('142.0');
+  });
+
   it('keeps Firefox-only settings out of Chromium manifests', () => {
     expect(manifestFor('chrome')).not.toHaveProperty('browser_specific_settings');
     expect(manifestFor('edge')).not.toHaveProperty('browser_specific_settings');

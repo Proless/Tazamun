@@ -19,7 +19,7 @@ The goal is consolidation: replace a separate bookmark syncer, tab manager and h
 
 | What | Where |
 | ---- | ----- |
-| Requirements with IDs (`ACC-`, `ENG-`, `TAB-`, `HIS-`, `BMK-`, `EXT-`, `DSH-`, `UI-`, `IMP-`, `ADM-`, `DEP-`, `PERF-`, `SEC-`, `PRIV-`, `REL-`) | [`docs/srs/`](docs/srs/) sections 1–6 |
+| Requirements with IDs (`ACC-`, `ENG-`, `TAB-`, `HIS-`, `BMK-`, `EXT-`, `DSH-`, `UI-`, `IMP-`, `ADM-`, `DEP-`, `PERF-`, `SEC-`, `PRIV-`, `REL-`, `MOB-`) | [`docs/srs/`](docs/srs/) sections 1–6 |
 | Design decisions and why | [`docs/adr/`](docs/adr/README.md) |
 | HTTP API and record envelope | [SRS section 4.4](<docs/srs/4. External Interface Requirements.md#44-communications-interfaces>) |
 | Self-hosting, container image, publishing pipeline | [SRS section 3.11](<docs/srs/3. Software Features.md#311-self-hosting-containers-and-image-publishing>), [ADR-0007](docs/adr/0007-container-distribution.md) |
@@ -141,16 +141,22 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 
 **Exit:** you use it daily on 3 browsers for a week, **against your own instance running the published `edge` image with `docker-compose.caddy.yml`**. A fresh VPS goes from nothing to a healthy HTTPS instance in under 10 minutes by following the docs. PERF-1 is met. Killing the server or the service worker mid-sync loses nothing (REL-3). **You uninstall your current tab tool.**
 
-### P2: History (3–4 weeks)
+### P2: History and Firefox for Android (5–7 weeks)
 
+- [ ] **Android spike first** on a real phone: add `gecko_android.strict_min_version: 142.0`, check `web-ext lint` is clean and AMO accepts an unlisted test version; then `tabs` events, alarms in the background, private tabs, `management`, Argon2id time. Record the results in SRS 3.12 ([ADR-0012](docs/adr/0012-firefox-for-android-in-1-0.md); MOB-1, MOB-8, MOB-10).
+- [ ] Module capabilities (write, read, none), detected from the APIs present; generic handling in the engine and options page (MOB-2, MOB-6).
+- [ ] Tabs without `windows`: one window from `tabs.query`, `tabs` events only, open a window's tabs one by one (MOB-3, MOB-4).
+- [ ] Popup, options page and onboarding at 360 px and by touch (MOB-7). Kill and resume on Android loses nothing (MOB-9).
 - [ ] History record IDs via HMAC of the normalized URL (HIS-1). Write the **URL normalization** rules down and test them (see the pitfalls below).
 - [ ] Payload with capped visits and union merge, with property tests (HIS-2).
 - [ ] Chunked first import with progress UI; `onVisited` capture (HIS-3, HIS-4, PERF-3).
 - [ ] Filters for exclusions and schemes, and private windows only when the user turns that on (HIS-5, PRIV-1, PRIV-3).
 - [ ] Retention and `expiresAt`; tombstones; propagating native deletions; the "clear all" prompt (HIS-7…10).
 - [ ] Local IndexedDB index and search; popup search; `tz` address-bar keyword (HIS-11, HIS-12, UI-5).
+- [ ] Read-only history on Firefox for Android: pull, index and search other browsers' history (MOB-5).
+- [ ] Manual Android release checklist written down (MOB-10).
 
-**Exit:** searching history from any browser finds pages visited in the others. 100k entries search within 200 ms. Clearing a browser's history doesn't wipe synced history. **You uninstall your current history tool, if any.**
+**Exit:** searching history from any browser finds pages visited in the others, **including from Firefox for Android**. 100k entries search within 200 ms. Clearing a browser's history doesn't wipe synced history. A week of daily use with a phone: its tabs show on the desktops and theirs on it. **You uninstall your current history tool, if any.**
 
 ### P3: Dashboard, "the one place" (3–4 weeks)
 
@@ -188,7 +194,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 
 - [ ] Security review of crypto and protocol (SEC-10). Fix findings.
 - [ ] Privacy policy (PRIV-5) and a template for instance operators.
-- [ ] Store listings: Chrome Web Store, Edge Add-ons, AMO (with source upload). Permission justifications.
+- [ ] Store listings: Chrome Web Store, Edge Add-ons, AMO (with source upload, marked compatible with Firefox for Android, MOB-11). Permission justifications.
 - [ ] Documentation: user quick start, FAQ, self-hosting, backup and restore (ADM-6), upgrade notes.
 - [ ] Health and metrics (ADM-5). Import into an empty account (IMP-4).
 - [ ] **Release workflow** on `vX.Y.Z` tags: SemVer image tags (pre-releases never move `latest`), Docker Hub mirror, keyless cosign signing, SBOM and provenance attestations, store packages and AMO source archive attached to the GitHub release, changelog (DEP-31, DEP-32, DEP-35, DEP-36, DEP-39).
@@ -201,7 +207,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 
 ### After 1.0 (backlog, in rough priority order)
 
-Firefox for Android · Helm chart · push notifications instead of polling · key rotation · reading list / saved-for-later · WebDAV or S3 storage backends (Q6) · Arabic translation (right-to-left) · padding records to hide sizes · signed record history (detect rollbacks) · Safari (only if its extension APIs allow it).
+Helm chart · push notifications instead of polling · key rotation · reading list / saved-for-later · WebDAV or S3 storage backends (Q6) · Arabic translation (right-to-left) · padding records to hide sizes · signed record history (detect rollbacks) · Safari (only if its extension APIs allow it).
 
 ---
 
@@ -214,7 +220,7 @@ From [SRS 6.5](<docs/srs/6. Other Requirements.md#65-known-limitations-and-open-
 - Account-key rotation is manual (export, new account, import).
 - No sync for data without extension APIs: Firefox bookmark tags and keywords, passwords, settings. Tab groups aren't synced at all, by choice (TAB-1).
 - Record sizes and timing aren't padded, so traffic analysis can reveal activity patterns.
-- Desktop only. Chrome and Edge on Android can't run the extension.
+- On mobile, only Firefox for Android, as a partial device: no history recording and no bookmarks there (no extension APIs), and background sync only while Android lets Firefox run ([ADR-0012](docs/adr/0012-firefox-for-android-in-1-0.md)). Chrome and Edge on Android can't run the extension.
 - One account per browser profile (ACC-12). A server hosts many accounts; one browser profile connects to one of them. Several accounts in one browser means one profile each.
 - One server instance per `/data`, on local storage only (SQLite). No horizontal scaling and no high availability in 1.0 ([ADR-0007](docs/adr/0007-container-distribution.md)).
 - The browser's own address-bar autocomplete won't suggest pages visited only in other browsers (use `tz`) ([ADR-0005](docs/adr/0005-history-stored-in-extension.md)).
