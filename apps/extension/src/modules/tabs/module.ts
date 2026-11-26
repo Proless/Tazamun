@@ -7,9 +7,9 @@
 import type { WxtBrowser } from 'wxt/browser';
 import { merge, schema } from '@tazamun/core';
 import { getSettings } from '../../account/store.ts';
-import { parseExclusions } from '../../lib/exclusions.ts';
+import { isSyncableUrl, parseExclusions } from '../../lib/exclusions.ts';
 import type { DetectContext, LocalChange, SyncModule, SyncRecord } from '../../engine/module.ts';
-import { buildTabsData, type BrowserWindow } from './snapshot.ts';
+import { buildTabsData, withRecent, type BrowserWindow } from './snapshot.ts';
 
 /** TAB-5: tab events come in bursts (a page loading fires several); wait for them to settle. */
 export const TABS_DEBOUNCE_MS = 5_000;
@@ -18,9 +18,11 @@ export class TabsModule implements SyncModule<schema.TabsData> {
   readonly collection = schema.COLLECTIONS.tabs;
   readonly debounceMs = TABS_DEBOUNCE_MS;
   readonly #browser: WxtBrowser;
+  readonly #now: () => number;
 
-  constructor(browser: WxtBrowser) {
+  constructor(browser: WxtBrowser, now: () => number = () => Date.now()) {
     this.#browser = browser;
+    this.#now = now;
   }
 
   /**
@@ -34,14 +36,20 @@ export class TabsModule implements SyncModule<schema.TabsData> {
       this.#browser.windows.getAll({ populate: true, windowTypes: ['normal'] }),
       getSettings(this.#browser),
     ]);
-    const data = buildTabsData(windows as BrowserWindow[], {
-      exclusions: parseExclusions(settings.exclusions),
-      includePrivate: settings.includePrivate.tabs,
-    });
+    const exclusions = parseExclusions(settings.exclusions);
+    const includePrivate = settings.includePrivate.tabs;
+    const live = buildTabsData(windows as BrowserWindow[], { exclusions, includePrivate });
     const current = await ctx.mirror.get(ctx.deviceId);
-    if (current !== undefined && !current.payload.deleted) {
-      if (merge.jsonEqual(current.payload.data, data)) return [];
-    }
+    const previous =
+      current === undefined || current.payload.deleted ? undefined : current.payload.data;
+    // TAB-10: what was open before and isn't now moves to the recently closed list.
+    const data = withRecent(
+      live,
+      previous,
+      this.#now(),
+      (entry) => (includePrivate || entry.private !== true) && isSyncableUrl(entry.url, exclusions),
+    );
+    if (previous !== undefined && merge.jsonEqual(previous, data)) return [];
     return [{ id: ctx.deviceId, data }];
   }
 

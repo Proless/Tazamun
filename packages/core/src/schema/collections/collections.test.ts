@@ -34,6 +34,18 @@ describe('tabs', () => {
     expect(decode(tabs, data).status).toBe('ok');
   });
 
+  it('accepts private windows and recently closed tabs, and records without them (TAB-2, TAB-10)', () => {
+    const data = {
+      windows: [{ focused: true, private: true, tabs: [] }],
+      recent: [{ url: 'https://a.example/', title: 'A', closedAt: T, private: true }],
+    };
+    expect(decode(tabs, data).status).toBe('ok');
+    expect(decode(tabs, { windows: [] }).status).toBe('ok');
+    expect(
+      decode(tabs, { ...data, recent: [{ url: 'https://a.example/', title: 'A' }] }).status,
+    ).toBe('invalid');
+  });
+
   it('rejects data: favicons and favicon URLs over 512 characters (TAB-4)', () => {
     const long = `https://example.org/${'a'.repeat(MAX_FAVICON_URL_LENGTH)}`;
     expect(

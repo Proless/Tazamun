@@ -11,7 +11,8 @@ The Tazamun browser extension for Chrome, Edge and Firefox, built with [WXT](htt
 | Options page (UI-3, P1 part): username (set or change, ACC-13), new recovery key (ACC-5), rename this device, remember the key, sync status and pause, modules on or off with the PRIV-2 question, sites that never sync, devices with *Remove* (ACC-8), sign out | Done |
 | Sync engine in `src/engine/`: module interface, outbox and mirror in IndexedDB, debounced push, alarm and popup pull, backoff, status, pause, per-module switches (ENG-1…14) | Done |
 | Toolbar badge for error, locked and paused only (UI-6) | Done |
-| Tabs module in `src/modules/tabs/`: windows and tabs of this device, privileged schemes and exclusions left out, private windows only when turned on (TAB-2, PRIV-1), favicons stripped, 5 s debounce (TAB-1…5) | Done |
+| Tabs module in `src/modules/tabs/`: windows and tabs of this device, privileged schemes and exclusions left out, private windows only when turned on (TAB-2, PRIV-1), favicons stripped, 5 s debounce, recently closed tabs (TAB-1…5, TAB-10) | Done |
+| Popup's other tabs: *Open now* or *Open when last seen* (not seen for 10 minutes), and a collapsed *Recently closed* list per browser (TAB-6, TAB-10, TAB-11) | Done |
 | Popup: *Tabs on other browsers* by device and window, last seen, open one or all (TAB-6) | Done |
 | Icons (placeholder design) in `public/icons/` | Done |
 
@@ -56,6 +57,7 @@ Browser A is Chromium (Playwright; once: `pnpm --filter @tazamun/extension exec 
 | Create the account on A (username, recovery key shown), sign B in with the username | SRS 3.1, ACC-1…7, ACC-13 |
 | Each browser's tabs appear in the other's popup, with the device name | TAB-1, TAB-6 |
 | A new tab on A shows in B's open popup within 15 s, without reloading | PERF-1 |
+| A tab closed on A shows under *Recently closed* on B | TAB-10 |
 | Kill the server, change tabs, restart: the change arrives, nothing pending | REL-3 |
 | A removes B; B shows the revoked state and keeps its account data | ACC-8, ACC-11 |
 | B recovers with the recovery key and a new passphrase; A is signed out | ACC-5 |

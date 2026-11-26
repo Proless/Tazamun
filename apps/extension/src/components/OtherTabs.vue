@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// TAB-6: other devices' tabs, grouped by device and window, with device name and last-seen time.
+// TAB-6: other devices' tabs, grouped by device and window, with device name and last-seen time;
+// "open now" or "open when last seen" (TAB-11), and the recently closed ones (TAB-10).
 // Click a tab to open it here, or open a whole window. Favicons aren't loaded: fetching them from
 // the sites would be a third-party request (PRIV-4).
 import { computed, ref } from 'vue';
@@ -26,8 +27,12 @@ const now = Date.now();
 const locale = uiLocale();
 
 const groups = computed<DeviceTabs[]>(() =>
-  otherDevicesTabs(props.records, props.devices, props.selfId),
+  otherDevicesTabs(props.records, props.devices, props.selfId, now),
 );
+
+function closedLabel(closedAt: number): string {
+  return t('tabsClosedAgo', [formatLastSeen(closedAt, now, locale)]);
+}
 
 function deviceLabel(group: DeviceTabs): string {
   const name = group.name ?? t('tabsUnknownDevice');
@@ -57,6 +62,13 @@ async function openAll(w: schema.TabWindow): Promise<void> {
     <p v-if="groups.length === 0" class="muted hint">{{ t('tabsNone') }}</p>
     <div v-for="group in groups" :key="group.deviceId" class="device">
       <h3>{{ deviceLabel(group) }}</h3>
+      <p v-if="group.tabCount > 0" class="section muted">
+        {{
+          group.live === false
+            ? t('tabsOpenWhenLastSeen', [String(group.tabCount)])
+            : t('tabsOpenNow', [String(group.tabCount)])
+        }}
+      </p>
       <div v-for="(w, i) in group.windows" :key="i" class="window">
         <div v-if="group.windows.length > 1 || w.tabs.length > 1 || w.private" class="window-head">
           <span class="muted">
@@ -74,6 +86,22 @@ async function openAll(w: schema.TabWindow): Promise<void> {
           </li>
         </ul>
       </div>
+      <details v-if="group.recent.length > 0" class="recent">
+        <summary class="muted">
+          {{ t('tabsRecentlyClosed', [String(group.recent.length)]) }}
+        </summary>
+        <ul>
+          <li v-for="(tab, j) in group.recent" :key="j">
+            <button type="button" class="tab" :title="tab.url" @click="open(tab.url)">
+              <span class="title">{{ tab.title || displayHost(tab.url) }}</span>
+              <span class="host muted">
+                {{ displayHost(tab.url) }} · {{ closedLabel(tab.closedAt) }}
+                <template v-if="tab.private"> · {{ t('tabsPrivateWindow') }}</template>
+              </span>
+            </button>
+          </li>
+        </ul>
+      </details>
     </div>
     <p v-if="result === 'copied'" role="status" class="hint">{{ t('tabsCopied') }}</p>
     <p v-if="result === 'failed'" role="alert" class="error">{{ t('tabsOpenFailed') }}</p>
@@ -95,6 +123,17 @@ h2 {
 h3 {
   margin-block: 0.75rem 0.25rem;
   font-size: 0.9rem;
+}
+
+.section {
+  margin-block: 0 0.125rem;
+  font-size: 0.8rem;
+}
+
+.recent summary {
+  margin-block-start: 0.375rem;
+  font-size: 0.8rem;
+  cursor: pointer;
 }
 
 .window-head {

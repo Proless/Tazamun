@@ -756,5 +756,45 @@
   "privateWindowsNotAllowed": {
     "message": "Your browser doesn’t let Tazamun into private windows yet, so none are synced. Chrome and Edge: open the extensions page, choose Details under Tazamun, and turn on “Allow in Incognito” (Edge: “Allow in InPrivate”). Firefox: open Add-ons and themes, choose Tazamun, and set “Run in Private Windows” to Allow.",
     "description": "Options: shown when private windows are switched on but the browser doesn’t allow the extension in them."
+  },
+  "tabsOpenNow": {
+    "message": "Open now ($COUNT$)",
+    "description": "Popup: heading above the tabs open on another browser that is online (TAB-11).",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "tabsOpenWhenLastSeen": {
+    "message": "Open when last seen ($COUNT$)",
+    "description": "Popup: heading above the tabs of a browser not seen for over 10 minutes: they were open then, maybe not now (TAB-11).",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "5"
+      }
+    }
+  },
+  "tabsRecentlyClosed": {
+    "message": "Recently closed ($COUNT$)",
+    "description": "Popup: collapsible list of tabs closed on another browser in the last 7 days (TAB-10).",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "8"
+      }
+    }
+  },
+  "tabsClosedAgo": {
+    "message": "closed $WHEN$",
+    "description": "Popup: when a recently closed tab was closed, e.g. \"closed 1 hour ago\".",
+    "placeholders": {
+      "when": {
+        "content": "$1",
+        "example": "1 hour ago"
+      }
+    }
   }
 }
