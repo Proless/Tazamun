@@ -57,6 +57,11 @@ export interface EngineMeta {
   readonly updateRequired?: boolean;
   /** Last run that completed without an error, ms since epoch. */
   readonly lastSuccessAt?: number;
+  /**
+   * ENG-16: the server's data generation last seen. A different one means the server was restored
+   * from a backup: everything is pulled again and what the server lost is pushed back.
+   */
+  readonly generation?: string;
 }
 
 export interface Commit {
@@ -76,6 +81,7 @@ export interface Commit {
     readonly updateRequired?: boolean;
     readonly owner?: string;
     readonly lastSuccessAt?: number;
+    readonly generation?: string;
   };
 }
 
@@ -106,6 +112,7 @@ export function mergeMeta(current: EngineMeta, update: NonNullable<Commit['meta'
   if (update.owner !== undefined) next.owner = update.owner;
   if (update.lastSuccessAt !== undefined) next.lastSuccessAt = update.lastSuccessAt;
   if (update.updateRequired !== undefined) next.updateRequired = update.updateRequired;
+  if (update.generation !== undefined) next.generation = update.generation;
   if (update.retry === null) delete next.retry;
   else if (update.retry !== undefined) next.retry = update.retry;
   return next;

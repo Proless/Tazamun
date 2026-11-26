@@ -11,7 +11,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } fr
 import { join } from 'node:path';
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
 import type { schema } from '@tazamun/core';
-import { MIGRATIONS } from './migrations.ts';
+import { GENERATION_SINCE_VERSION, MIGRATIONS } from './migrations.ts';
 
 export const DATABASE_FILE = 'tazamun.db';
 /** DEP-24: keep the last 3 pre-migration backups. */
@@ -339,8 +339,10 @@ export class Database {
 
     // `seq` must never go backwards (ADR-0003): devices have pulled up to the replaced database's
     // counters, and would skip new records numbered below them. Keep each account's counter at
-    // least as high as it was.
-    if (seqFloors.length > 0 && version > 0) {
+    // least as high as it was. And give the data a new generation (ENG-16), so devices notice that
+    // records went back to older versions and push theirs again. A backup from before
+    // `server_meta` gets a fresh generation when the server migrates it.
+    if (version > 0) {
       const restored = Database.open(dbPath, { mode: 'inspect' });
       try {
         restored.transaction(() => {
@@ -349,6 +351,11 @@ export class Database {
               'UPDATE accounts SET last_seq = MAX(last_seq, ?) WHERE id = ?',
               num(row, 'last_seq'),
               str(row, 'id'),
+            );
+          }
+          if (version >= GENERATION_SINCE_VERSION) {
+            restored.#run(
+              "UPDATE server_meta SET value = lower(hex(randomblob(16))) WHERE key = 'generation'",
             );
           }
         });
@@ -529,6 +536,12 @@ export class Database {
         keepSessionHash ?? null,
       );
     });
+  }
+
+  /** ENG-16: the data generation; changes on every restore. */
+  generation(): string {
+    const row = this.#get("SELECT value FROM server_meta WHERE key = 'generation'");
+    return row === undefined ? '' : str(row, 'value');
   }
 
   /** Metadata of every account, for `tazamun accounts list` (DEP-16). Never content. */

@@ -186,6 +186,42 @@ describe('records', () => {
   });
 });
 
+describe('data generation (ENG-16)', () => {
+  it('has one from the start and keeps it across restarts', () => {
+    const path = join(tempDir(), 'db.sqlite');
+    const db = Database.open(path);
+    const first = db.generation();
+    expect(first).toMatch(/^[0-9a-f]{32}$/);
+    db.close();
+    const again = Database.open(path);
+    expect(again.generation()).toBe(first);
+    again.close();
+  });
+
+  it('gets a new one when a backup is restored', () => {
+    const dir = tempDir();
+    const path = join(dir, 'live.db');
+    const db = Database.open(path);
+    withAccount(db);
+    const before = db.generation();
+    db.backupTo(join(dir, 'backup.db'));
+    db.close();
+    Database.restore(path, join(dir, 'backup.db'), join(dir, 'safety.db'));
+    const restored = Database.open(path);
+    expect(restored.generation()).toMatch(/^[0-9a-f]{32}$/);
+    expect(restored.generation()).not.toBe(before);
+    restored.close();
+  });
+
+  it('gets one when a database from before migration 3 is upgraded', () => {
+    const path = join(tempDir(), 'db.sqlite');
+    Database.open(path, { migrations: MIGRATIONS.slice(0, 2) }).close();
+    const db = Database.open(path);
+    expect(db.generation()).toMatch(/^[0-9a-f]{32}$/);
+    db.close();
+  });
+});
+
 describe('backupTo (DEP-25)', () => {
   it('writes a consistent copy that opens on its own', () => {
     const dir = tempDir();

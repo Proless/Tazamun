@@ -73,4 +73,16 @@ export const MIGRATIONS: readonly string[] = [
   ALTER TABLE accounts ADD COLUMN recovery_auth_hash BLOB;           -- SHA-256(recovery auth key)
   ALTER TABLE accounts ADD COLUMN recovery_wrapped_account_key TEXT;
   `,
+  // 3: server-wide values. `generation` changes on every restore (ENG-16), so clients notice that
+  // the data went back in time even though seq never does.
+  `
+  CREATE TABLE server_meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  ) STRICT;
+  INSERT INTO server_meta (key, value) VALUES ('generation', lower(hex(randomblob(16))));
+  `,
 ];
+
+/** The first schema version with `server_meta` (and so a data generation). */
+export const GENERATION_SINCE_VERSION = 3;

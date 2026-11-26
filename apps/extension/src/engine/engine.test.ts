@@ -105,6 +105,42 @@ describe('SyncEngine', () => {
     });
   });
 
+  it('pulls everything and pushes back what a restored server lost (ENG-16)', async () => {
+    const server = new FakeServer();
+    const a = device(server, 'dev_A');
+    const b = device(server, 'dev_B');
+    a.module.browser = tabsWith('https://old.example/');
+    await a.engine.sync('local-change');
+    // The operator takes a backup here.
+    const backup = new Map([...server.records].map(([name, rs]) => [name, new Map(rs)]));
+    a.module.browser = tabsWith('https://new.example/');
+    a.clock.now += 1000;
+    await a.engine.sync('local-change');
+    b.module.browser = tabsWith('https://b.example/');
+    await b.engine.sync('local-change');
+    await a.engine.sync('alarm');
+
+    // Restore: older records, B's record gone, seq kept (Database.restore), new generation.
+    server.records.clear();
+    for (const [name, rs] of backup) server.records.set(name, rs);
+    server.generation = 'gen-2';
+
+    // Without the new generation nothing would be pulled: seq didn't go back.
+    expect((await a.engine.sync('alarm')).state).toBe('idle');
+    expect(server.collection('tabs').has('dev_B')).toBe(true);
+    const c = device(server, 'dev_C');
+    await c.engine.sync('alarm');
+    expect(await mirrored(c, 'dev_A')).toMatchObject({ data: tabsWith('https://new.example/') });
+    expect(await mirrored(c, 'dev_B')).toMatchObject({ data: tabsWith('https://b.example/') });
+    // Nothing was deleted on A, and the new generation is remembered: the next run is quiet.
+    expect(await mirrored(a, 'dev_B')).toMatchObject({ deleted: false });
+    // (One more run picks up the records it just pushed; after that, an alarm costs one request.)
+    await a.engine.sync('alarm');
+    server.requests.length = 0;
+    await a.engine.sync('alarm');
+    expect(server.requests).toEqual(['GET /v1/info']);
+  });
+
   it('warns when this clock is more than 5 minutes off the server (ENG-15)', async () => {
     const server = new FakeServer();
     const a = device(server, 'dev_A');

@@ -302,6 +302,12 @@ export class SyncEngine {
     }
     const highWater = info.account?.collections ?? {};
     const meta = await this.#deps.store.getMeta();
+    // ENG-16: the server was restored from a backup since the last sync. Its records may be older
+    // than this device's, and records newer than the backup are gone from it.
+    const restored =
+      info.generation !== undefined &&
+      meta.generation !== undefined &&
+      info.generation !== meta.generation;
     const versionChanged = meta.clientVersion !== this.#deps.clientVersion;
     const now = this.#deps.now();
     for (const module of ctx.modules) {
@@ -314,18 +320,34 @@ export class SyncEngine {
         (state.lastSyncAt !== undefined && now - state.lastSyncAt > FULL_RECONCILE_AFTER_MS) ||
         top < state.lastSeq;
       if (versionChanged) await this.#retryHeld(ctx, module);
-      if (full) await this.#pull(ctx, module, 0, true);
-      else if (top > state.lastSeq) await this.#pull(ctx, module, state.lastSeq, false);
+      if (restored) await this.#pull(ctx, module, 0, 'restored');
+      else if (full) await this.#pull(ctx, module, 0, 'reconcile');
+      else if (top > state.lastSeq) await this.#pull(ctx, module, state.lastSeq, 'incremental');
       await this.#deps.store.commit({ meta: { collections: { [name]: { lastSyncAt: now } } } });
     }
     // ENG-10: held records stay held until an update; after one, they were all re-read above.
     const stillHeld = ctx.updateRequired || (!versionChanged && meta.updateRequired === true);
     await this.#deps.store.commit({
-      meta: { clientVersion: this.#deps.clientVersion, updateRequired: stillHeld },
+      meta: {
+        clientVersion: this.#deps.clientVersion,
+        updateRequired: stillHeld,
+        // Only after every module was re-read: a crash midway repeats the whole recovery.
+        ...(info.generation === undefined ? {} : { generation: info.generation }),
+      },
     });
   }
 
-  async #pull(ctx: RunContext, module: AnyModule, since: number, full: boolean): Promise<void> {
+  /**
+   * `incremental`: from the last `seq`. `reconcile`: everything, and records the server no longer
+   * has are gone (their tombstones expired). `restored` (ENG-16): everything, and records the server
+   * no longer has are newer than its backup, so they are pushed back, never deleted here.
+   */
+  async #pull(
+    ctx: RunContext,
+    module: AnyModule,
+    since: number,
+    mode: 'incremental' | 'reconcile' | 'restored',
+  ): Promise<void> {
     const name = module.collection.name;
     const key = await ctx.keys.collectionKey(name);
     const seen = new Set<string>();
@@ -340,7 +362,34 @@ export class SyncEngine {
       cursor = page.nextSince;
       if (!page.more) break;
     }
-    if (full) await this.#dropMissing(ctx, module, seen, cursor);
+    if (mode === 'reconcile') await this.#dropMissing(ctx, module, seen, cursor);
+    if (mode === 'restored') await this.#pushMissing(ctx, module, key, seen);
+  }
+
+  /**
+   * ENG-16, rule 6: after a restore, records in the mirror that the server lacks were written after
+   * its backup. Queue them for push again, unchanged (same HLC, fresh nonce), so the server gets
+   * back what it lost. Records waiting in the outbox are pushed anyway. Held records (ENG-10) are
+   * left alone: this client can't read them, another device that can will push them.
+   */
+  async #pushMissing(
+    ctx: RunContext,
+    module: AnyModule,
+    key: CryptoKey,
+    seen: ReadonlySet<string>,
+  ): Promise<void> {
+    const name = module.collection.name;
+    const pending = new Set(
+      (await this.#deps.store.listOutbox()).filter((e) => e.collection === name).map((e) => e.id),
+    );
+    const outboxPut: OutboxEntry[] = [];
+    for (const entry of await this.#deps.store.listMirror(name)) {
+      if (seen.has(entry.id) || pending.has(entry.id) || entry.payload === undefined) continue;
+      const payload = entry.payload as Payload<unknown>;
+      const expiresAt = payload.deleted ? this.#tombstoneExpiry() : undefined;
+      outboxPut.push(await this.#outboxEntry(ctx, key, name, entry.id, payload, expiresAt));
+    }
+    if (outboxPut.length > 0) await this.#deps.store.commit({ outboxPut });
   }
 
   /**
