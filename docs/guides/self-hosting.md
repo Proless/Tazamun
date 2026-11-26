@@ -109,7 +109,7 @@ docker compose run --rm --no-deps tazamun restore /data/backups/restore.db
 docker compose start tazamun
 ```
 
-`restore` checks the backup with `PRAGMA integrity_check` first, and saves the current database as `pre-restore-<time>.db` before replacing it. Changes made after the backup was taken are lost on the server, but devices keep their local data.
+`restore` checks the backup with `PRAGMA integrity_check` first, and saves the current database as `pre-restore-<time>.db` before replacing it. Changes made after the backup was taken are lost on the server at first, but devices keep their local data: the restore gives the data a new generation, and each device that syncs afterwards sends back what it has that the backup lacks (ENG-16). Records from a device that is never used again stay lost.
 
 ## Upgrades
 

@@ -14,6 +14,7 @@ const statusSchema = z.object({
   reason: z.string().optional(),
   updateRequired: z.boolean().optional(),
   clockWarning: z.boolean().optional(),
+  clockSkewMinutes: z.number().optional(),
   lastSync: z.record(z.string(), z.number()),
   lastSuccessAt: z.number().optional(),
   retryAt: z.number().optional(),
@@ -50,6 +51,24 @@ export function statusMessageKey(status: EngineStatus): MessageKey {
     case 'idle':
       return status.lastSuccessAt === undefined ? 'statusIdleNever' : 'statusIdle';
   }
+}
+
+/**
+ * ENG-15: a warning about clocks, shown under the status line, or undefined. A skewed local clock
+ * comes first: it's the one the user can fix on this computer.
+ */
+export function clockNotice(
+  status: EngineStatus,
+): { key: MessageKey; substitutions: string[] } | undefined {
+  const skew = status.clockSkewMinutes;
+  if (skew !== undefined) {
+    return {
+      key: skew > 0 ? 'statusClockAhead' : 'statusClockBehind',
+      substitutions: [String(Math.abs(skew))],
+    };
+  }
+  if (status.clockWarning === true) return { key: 'statusClockRemote', substitutions: [] };
+  return undefined;
 }
 
 /**

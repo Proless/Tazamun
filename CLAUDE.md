@@ -130,7 +130,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 - [x] **CI image pipeline:** build on every PR plus a container smoke test (health, API suite, SIGTERM, restart persistence); vulnerability scan; multi-arch with Buildx; publish `edge` and `sha-*` to GHCR from `main` with minimal token permissions (DEP-28…30, DEP-33, DEP-34, DEP-38).
 - [x] **Extension scaffold:** WXT with three targets. Fixed Firefox add-on ID. CSP with `'wasm-unsafe-eval'`. Permissions as in SRS 2.7.
 - [x] **Onboarding:** create or connect an account, recovery kit, device registration (ACC-1…8, ACC-11, UI-2). *(Since [ADR-0010](docs/adr/0010-usernames-and-recovery-key.md): usernames for signing in and a recovery key that sets a new passphrase, instead of the recovery kit and pairing code; ACC-5, ACC-13.)*
-- [x] **Engine:** outbox in IndexedDB, debounced push, alarm and popup-triggered pull, backoff, status, pause, per-module toggles (ENG-1…14).
+- [x] **Engine:** outbox in IndexedDB, debounced push, alarm and popup-triggered pull, backoff, status, pause, per-module toggles (ENG-1…14). Clock warnings (ENG-15). Recovery after a server restore through a data generation (ENG-16).
 - [x] **Module interface** plus an in-memory fake browser for tests. *(WXT's fake browser, plus `FakeServer` and `FakeTabsModule` in `apps/extension/src/engine/testing.ts`.)*
 - [x] **Tabs module:** publish windows and tabs; incognito, scheme and exclusion filtering; strip favicons (TAB-1…6). *(Private windows are an opt-in per browser since [ADR-0011](docs/adr/0011-private-browsing-choice-and-no-send-tab.md).)*
 - [x] **Recently closed tabs and live state:** closed tabs, including a closed last window, move to a per-device list (50, 7 days); devices not seen for 10 minutes show *open when last seen* (TAB-10, TAB-11).
@@ -207,7 +207,7 @@ Rough estimates assume one developer working evenings. Each phase ends with **ex
 
 ### After 1.0 (backlog, in rough priority order)
 
-Helm chart · push notifications instead of polling · key rotation · tab groups · reading list / saved-for-later · WebDAV or S3 storage backends (Q6) · Arabic translation (right-to-left) · padding records to hide sizes · signed record history (detect rollbacks) · Safari (only if its extension APIs allow it).
+Helm chart · push notifications instead of polling · key rotation · reading list / saved-for-later · WebDAV or S3 storage backends (Q6) · Arabic translation (right-to-left) · padding records to hide sizes · signed record history (detect rollbacks) · Safari (only if its extension APIs allow it).
 
 ---
 
@@ -218,7 +218,7 @@ From [SRS 6.5](<docs/srs/6. Other Requirements.md#65-known-limitations-and-open-
 - Losing both the passphrase and the recovery key, with no signed-in device, means lost data. No server-side recovery is possible by design ([ADR-0010](docs/adr/0010-usernames-and-recovery-key.md)).
 - A malicious server can withhold or roll back records, and can serve a backdoored dashboard.
 - Account-key rotation is manual (export, new account, import).
-- No sync for data without extension APIs: Firefox bookmark tags and keywords, tab group colours, passwords, settings.
+- No sync for data without extension APIs: Firefox bookmark tags and keywords, passwords, settings. Tab groups aren't synced at all, by choice (TAB-1).
 - Record sizes and timing aren't padded, so traffic analysis can reveal activity patterns.
 - On mobile, only Firefox for Android, as a partial device: no history recording and no bookmarks there (no extension APIs), and background sync only while Android lets Firefox run ([ADR-0012](docs/adr/0012-firefox-for-android-in-1-0.md)). Chrome and Edge on Android can't run the extension.
 - One account per browser profile (ACC-12). A server hosts many accounts; one browser profile connects to one of them. Several accounts in one browser means one profile each.
@@ -287,10 +287,10 @@ Pitfalls for one app or package live in that folder's `CLAUDE.md`. The sections 
 - **GHCR visibility:** a newly created package on GHCR is private by default. Make it public once, and link it to the repository.
 - **Docker Hub limits:** anonymous pulls are rate-limited. Default the docs to GHCR.
 - **Pin third-party actions by commit SHA**, with the version in a comment (`uses: docker/build-push-action@<sha> # v7.4.0`). Tags can be moved; `trivy-action`'s were hijacked in 2026. Dependabot updates SHA pins. Pick releases at least two weeks old, as `minimumReleaseAge` does for npm.
-- **The repository and `ghcr.io/proless/tazamun` are public** (since 2026-11-25). Making the repository public did **not** change the existing package: its visibility is set separately in the package settings, and until then an anonymous pull fails with `unauthorized`. `image.yml` uploads SARIF to code scanning only while the repository is public (`!github.event.repository.private`); keep that guard, since a private repository needs GitHub Advanced Security for it. A stale `docker login ghcr.io` also gives `unauthorized` for a public image: `docker logout ghcr.io`.
+- **The repository and `ghcr.io/proless/tazamun` are public** (since 2026-11-25). Making the repository public did **not** change the existing package: its visibility is set separately in the package settings, and until then an anonymous pull fails with `unauthorized`. `image.yml` uploads SARIF to code scanning only while the repository is public (`!github.event.repository.private`); keep that guard, since a private repository needs GitHub Advanced Security for it. The upload needs `security-events: write` on the `test` job. Without it, pull requests still pass but every push to `main` fails at "Upload to code scanning" ("Resource not accessible by integration"), and `publish` is skipped, so `edge` silently stops updating. That happened from 2026-11-25 until the job got the permission. A stale `docker login ghcr.io` also gives `unauthorized` for a public image: `docker logout ghcr.io`.
 - **The smoke test** (`apps/server/test/smoke.ts`) runs on the runner, talks to the container over a random loopback port, and uses `@tazamun/core` like a real client (Argon2id included). Run it locally with `pnpm --filter @tazamun/server smoke <image>`.
 - **The arm64 smoke test runs under QEMU and has failed once on a PR that didn't touch the server:** the container logged "Listening" and exited, and the re-run passed. If it fails, read the exit code, OOMKilled flag and stderr it prints (132 or 139 point at emulation, 137 with OOMKilled at the memory limit), re-run once, and investigate if it repeats.
-- **Token scope:** don't give the workflow `write-all`. Use `packages: write` and `id-token: write` only where needed, and keep the Docker Hub token out of PR workflows from forks.
+- **Token scope:** don't give the workflow `write-all`. Use `packages: write`, `id-token: write` and `security-events: write` only on the jobs that need them, and keep the Docker Hub token out of PR workflows from forks.
 - **Reverse proxies:** nginx's default `client_max_body_size` (1 MB) is below the API's 2 MB batch limit, and missing `X-Forwarded-Proto` breaks the public-URL check. Both belong in the proxy examples.
 
 ## How to work in this repository (for Claude)

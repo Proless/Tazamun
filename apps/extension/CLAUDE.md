@@ -29,6 +29,7 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 - During recovery, `INVALID_CREDENTIALS` means a wrong recovery key or username, not a wrong passphrase; `errorKey(err, 'recover')` maps it. Pass the mode.
 - The stored `username` is optional: accounts from before ADR-0010 have none until the options page sets it (`loadAccountInfo` refreshes it from `GET /v1/accounts/me`). Code that shows or needs it must handle it missing.
 - **`permissions.request` must run before the first `await` in a click handler.** Browsers grant it only during a user gesture, and an `await` ends the gesture. `submitServer` in the onboarding page parses the URL synchronously, calls `requestServerPermission`, then awaits. Keep that order.
+- **Never show an editable field before its async default is set.** The onboarding page loads the default device name, *remember key* and *tabs* in `onMounted`. If it showed the device step before they arrived, a slow load would overwrite what the user typed. That happened in CI: Firefox B was named "Firefox on Linux". `submitServer` awaits `defaultsLoaded` before showing the device step.
 - Match patterns have no port, and Firefox rejects one: request `http://localhost/*`, not `http://localhost:8080/*` (`account.hostPermissionPattern`).
 - Headless Chromium can't click the permission prompt. For an end-to-end run, load a copy of the build whose manifest already grants `http://localhost/*`; Chrome then answers `permissions.request` without a prompt.
 - `/v1/info` with a revoked token is a 401, not an anonymous answer. `refreshAccountState` treats both as signed out, and treats network errors as *still signed in* (offline isn't signed out).
@@ -45,6 +46,8 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 - `alarms.create` with an existing name resets that alarm's schedule. Create the poll only if `alarms.get` finds none, or every worker wake-up postpones it.
 - `runtime.onMessage` in Chrome needs `sendResponse` plus `return true`. WXT uses the plain `chrome` API there, without a promise polyfill, so a returned promise doesn't reach the page.
 - The background listens to `storage.onChanged` for `account`, `accountKey` and `settings`. The engine writes only `engineStatus`, so it never triggers itself; keep it that way.
+- **After a server restore (ENG-16)** the engine pulls everything with mode `restored`: records the server lacks are **pushed back** (`#pushMissing`), not deleted as in `reconcile` mode (`#dropMissing`, for expired tombstones). Mixing the two up would delete data newer than the backup on every device. The generation is stored only after all modules finished, so a crash repeats the recovery. Held records (ENG-10) aren't pushed back by this client. Records with an expiry (history, P2) will need their `expiresAt` when pushed back; tombstones get the usual 90 days.
+- **Clock warnings (ENG-15):** `#pullAll` compares the `time` from `/v1/info` with the middle of the request, so latency doesn't count, and sets `clockSkewMinutes` in the status (positive: this clock is ahead). `clockWarning` is the other case: a record stamped more than 24 h ahead. Popup and options show both through `clockNotice`; the badge doesn't. Set `FakeServer.time` to test it.
 - Engine tests use `FakeServer` and `FakeTabsModule` from `src/engine/testing.ts`. Module tests should use them too: they speak the real wire format through `@tazamun/core`'s schemas.
 
 ### Tabs module
@@ -90,7 +93,7 @@ Read this before changing anything in `apps/extension`. The repository-wide rule
 - Firefox refuses `tabs.create` for privileged URLs (`about:config` and others) and restricts `file:`. Fall back to copying the URL (TAB-8).
 - Firefox's `management.getAll()` returns add-on IDs, not store slugs.
 - Chrome's `history.addUrl` can't set title or time. That's one reason history isn't written back ([ADR-0005](../../docs/adr/0005-history-stored-in-extension.md)).
-- Tab group APIs differ.
+- Tab groups aren't synced (TAB-1). Don't add the `tabGroups` permission for them; the APIs differ between Chromium and Firefox.
 - Test **every** change on Firefox too. The Chromium end-to-end setup is easier to automate, so Firefox regressions slip through.
 
 ### Store publishing

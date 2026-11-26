@@ -265,6 +265,17 @@ export type AccountInfo = z.infer<typeof accountInfo>;
 /** `GET /v1/info` (SRS 4.4.3, PERF-5: kept small, as it is polled every alarm). */
 export const infoResponse = z.object({
   version: z.string(),
+  /**
+   * The server's clock when it answered (ENG-15). Clients compare it with their own and warn
+   * beyond 5 minutes (`hlc.isClockSkewed`). Optional: older servers don't send it.
+   */
+  time: isoDateTime.optional(),
+  /**
+   * The data generation (ENG-16): changes whenever the server's database is restored from a backup.
+   * A client that saw another one pulls everything again and pushes back what the server lost.
+   * Optional: older servers don't send it.
+   */
+  generation: z.string().min(1).max(64).optional(),
   minClientVersion: z.string(),
   registration: registrationMode,
   limits: serverLimits,
