@@ -4,7 +4,7 @@
 
 Tazamun syncs **tabs, history, bookmarks and your extension list** between browsers from different vendors. It replaces a separate tab manager, history tool and bookmark syncer, each with its own account. Your data is encrypted on your devices; the server only ever stores ciphertext, and you can run that server yourself.
 
-> **Status:** early development. P0 (foundations) is done: the shared core library with the clock, record schemas and encryption is built and tested. P1 (server, sync engine, accounts and tabs) is in progress: the server API is built; the extension is not yet. Nothing is usable yet. See the [roadmap](CLAUDE.md#roadmap).
+> **Status:** early development. P0 (foundations) is done: the shared core library with the clock, record schemas and encryption is built and tested. P1 (server, sync engine, accounts and tabs) is in progress: the server API is built; the extension is not yet. Nothing is usable yet. See the [roadmap](docs/roadmap.md).
 
 ## How it works
 
